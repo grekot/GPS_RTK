@@ -9,86 +9,201 @@
 		(date "2026-06-13")
 		(rev "v1")
 		(company "Projekt GPS_RTK")
-		(comment 1 "Scaffold - uzupelnic symbolami w KiCad (v2)")
+		(comment 1 "Schemat blokowy - capture z symbolami w v2")
 		(comment 2 "Polaczenia: elektronika/docs/02-schemat-polaczen.md")
 		(comment 3 "Pinout/protokol BLE: elektronika/docs/05-pinout-firmware.md")
 	)
 	(lib_symbols)
-	(text "ODBIORNIK GPS RTK - schemat blokowy v1 (scaffold)"
+
+	(text "ODBIORNIK GPS RTK - schemat blokowy v1"
 		(exclude_from_sim no)
-		(at 25 30 0)
-		(effects
-			(font (size 3 3) (bold yes))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000010")
+		(at 40 22 0)
+		(effects (font (size 3 3) (bold yes)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-000000000001")
 	)
-	(text "Tor sygnalu: Antena L1/L5 -> LC29HEA -> ESP32-WROOM (UART2 GPIO16 RX / GPIO17 TX) -> BLE NUS -> Smartfon (NTRIP) -> ASG-EUPOS"
-		(exclude_from_sim no)
-		(at 25 45 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000011")
-	)
-	(text "UART 3.3 V, 115200 (-> 460800): NMEA w gore, RTCM w dol, ten sam port. Oba uklady 3.3 V - bez konwersji poziomow."
-		(exclude_from_sim no)
-		(at 25 53 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000012")
-	)
-	(text "I2C (GPIO21 SDA / GPIO22 SCL): OLED SSD1306 0x3C + rezerwa IMU BNO085 0x4A (v2)."
-		(exclude_from_sim no)
-		(at 25 61 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000013")
-	)
-	(text "Zasilanie: 18650 -> TP4056 (USB-C, ochrona DW01A) -> buck-boost 3.3 V -> ESP32 + GNSS + OLED. Bulk 100-470 uF na szynie."
-		(exclude_from_sim no)
-		(at 25 69 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000014")
-	)
-	(text "Bateria: dzielnik 100k/100k -> GPIO34 (ADC1). LED status: GPIO2. Przycisk: GPIO27. PPS: GPIO35 (opc). RESET GNSS: GPIO4 (opc)."
-		(exclude_from_sim no)
-		(at 25 77 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000015")
-	)
-	(text "BLE NUS: TX 6E400003 (NMEA notify), RX 6E400002 (RTCM write), status 6E400004 (JSON, Read+Notify). MTU 247."
-		(exclude_from_sim no)
-		(at 25 85 0)
-		(effects
-			(font (size 2 2))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000016")
-	)
-	(text "UWAGA: to tylko scaffold (tekst). Pelny schemat z symbolami i polaczeniami narysuj w KiCad wg docs/02 i docs/05 (v2)."
-		(exclude_from_sim no)
-		(at 25 100 0)
-		(effects
-			(font (size 2.2 2.2) (italic yes))
-			(justify left bottom)
-		)
-		(uuid "a1b2c3d4-0000-4000-8000-000000000017")
-	)
+
+	(rectangle (start 40 30) (end 95 44)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000010"))
+	(text "Antena aktywna L1/L5"
+		(exclude_from_sim no) (at 42 36 0)
+		(effects (font (size 1.6 1.6) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000011"))
+	(text "bias 3.3V . ground plane Ø10-12 cm"
+		(exclude_from_sim no) (at 42 41 0)
+		(effects (font (size 1.2 1.2)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000012"))
+
+	(rectangle (start 40 58) (end 95 74)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000020"))
+	(text "Modul GNSS LC29HEA"
+		(exclude_from_sim no) (at 42 64 0)
+		(effects (font (size 1.6 1.6) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000021"))
+	(text "rover RTK . 1-10 Hz . 3.3V"
+		(exclude_from_sim no) (at 42 70 0)
+		(effects (font (size 1.2 1.2)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000022"))
+
+	(rectangle (start 40 92) (end 95 110)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000030"))
+	(text "ESP32-WROOM-32"
+		(exclude_from_sim no) (at 42 98 0)
+		(effects (font (size 1.6 1.6) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000031"))
+	(text "glupi most UART <-> BLE"
+		(exclude_from_sim no) (at 42 104 0)
+		(effects (font (size 1.2 1.2)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000032"))
+
+	(rectangle (start 40 132) (end 95 148)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000040"))
+	(text "Smartfon"
+		(exclude_from_sim no) (at 42 138 0)
+		(effects (font (size 1.6 1.6) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000041"))
+	(text "klient NTRIP . mapa . tyczenie"
+		(exclude_from_sim no) (at 42 144 0)
+		(effects (font (size 1.2 1.2)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000042"))
+
+	(rectangle (start 40 166) (end 95 182)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000050"))
+	(text "Caster NTRIP"
+		(exclude_from_sim no) (at 42 172 0)
+		(effects (font (size 1.6 1.6) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000051"))
+	(text "ASG-EUPOS . RTCM 3.x"
+		(exclude_from_sim no) (at 42 178 0)
+		(effects (font (size 1.2 1.2)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000052"))
+
+	(rectangle (start 130 90) (end 185 104)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000060"))
+	(text "OLED SSD1306"
+		(exclude_from_sim no) (at 132 96 0)
+		(effects (font (size 1.5 1.5) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000061"))
+	(text "status fixa/baterii"
+		(exclude_from_sim no) (at 132 101 0)
+		(effects (font (size 1.1 1.1)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000062"))
+
+	(rectangle (start 130 110) (end 185 124)
+		(stroke (width 0.2) (type dash)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000070"))
+	(text "IMU BNO085 (v2)"
+		(exclude_from_sim no) (at 132 116 0)
+		(effects (font (size 1.5 1.5)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000071"))
+	(text "rezerwa I2C"
+		(exclude_from_sim no) (at 132 121 0)
+		(effects (font (size 1.1 1.1)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000072"))
+
+	(rectangle (start 40 208) (end 88 224)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000080"))
+	(text "18650 3500 mAh"
+		(exclude_from_sim no) (at 42 214 0)
+		(effects (font (size 1.4 1.4) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000081"))
+	(text "Samsung 35E"
+		(exclude_from_sim no) (at 42 220 0)
+		(effects (font (size 1.1 1.1)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000082"))
+
+	(rectangle (start 104 208) (end 152 224)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-000000000090"))
+	(text "TP4056 USB-C"
+		(exclude_from_sim no) (at 106 214 0)
+		(effects (font (size 1.4 1.4) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000091"))
+	(text "ladowanie + ochrona"
+		(exclude_from_sim no) (at 106 220 0)
+		(effects (font (size 1.1 1.1)) (justify left))
+		(uuid "b0000000-0000-4000-8000-000000000092"))
+
+	(rectangle (start 168 208) (end 220 224)
+		(stroke (width 0.3) (type default)) (fill (type none))
+		(uuid "b0000000-0000-4000-8000-0000000000a0"))
+	(text "buck-boost 3.3V"
+		(exclude_from_sim no) (at 170 214 0)
+		(effects (font (size 1.4 1.4) (bold yes)) (justify left))
+		(uuid "b0000000-0000-4000-8000-0000000000a1"))
+	(text "Pololu S7V8F3"
+		(exclude_from_sim no) (at 170 220 0)
+		(effects (font (size 1.1 1.1)) (justify left))
+		(uuid "b0000000-0000-4000-8000-0000000000a2"))
+
+	(wire (pts (xy 67 44) (xy 67 58)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000b0"))
+	(label "RF / SMA + bias" (at 68 51 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000b1"))
+
+	(wire (pts (xy 67 74) (xy 67 92)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000b2"))
+	(label "UART 3.3V: NMEA / RTCM" (at 68 84 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000b3"))
+
+	(wire (pts (xy 67 110) (xy 67 132)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000b4"))
+	(label "BLE NUS: NMEA / RTCM / status" (at 68 122 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000b5"))
+
+	(wire (pts (xy 67 148) (xy 67 166)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000b6"))
+	(label "internet: poprawki RTCM" (at 68 158 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000b7"))
+
+	(wire (pts (xy 95 101) (xy 130 101)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000c0"))
+	(wire (pts (xy 112 101) (xy 112 117)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000c1"))
+	(wire (pts (xy 112 117) (xy 130 117)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000c2"))
+	(label "I2C (GPIO21/22)" (at 96 100 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000c3"))
+
+	(wire (pts (xy 88 216) (xy 104 216)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000d0"))
+	(wire (pts (xy 152 216) (xy 168 216)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000d1"))
+	(wire (pts (xy 220 216) (xy 236 216)) (stroke (width 0.2) (type default))
+		(uuid "b0000000-0000-4000-8000-0000000000d2"))
+	(label "3V3 -> ESP32 + GNSS + OLED" (at 222 215 0)
+		(effects (font (size 1.2 1.2)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000d3"))
+
+	(text "Baterie: dzielnik 100k/100k -> GPIO34 (ADC1) . LED: GPIO2 . Przycisk: GPIO27 . bulk 100-470uF na 3.3V"
+		(exclude_from_sim no) (at 40 236 0)
+		(effects (font (size 1.3 1.3)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000e0"))
+	(text "UART 460800 (domyslny EA), 8N1, oba uklady 3.3V (bez konwersji). EA: brak GST -> dokladnosc z fixType+HDOP."
+		(exclude_from_sim no) (at 40 242 0)
+		(effects (font (size 1.3 1.3)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000e1"))
+	(text "BLE: TX 6E400003 (NMEA), RX 6E400002 (RTCM), status 6E400004 (JSON). MTU 247. Nazwa: RTK-Rover."
+		(exclude_from_sim no) (at 40 248 0)
+		(effects (font (size 1.3 1.3)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000e2"))
+	(text "Pelny capture z symbolami + footprinty -> v2 (patrz kicad/README.md, docs/02, docs/05)."
+		(exclude_from_sim no) (at 40 256 0)
+		(effects (font (size 1.3 1.3) (italic yes)) (justify left bottom))
+		(uuid "b0000000-0000-4000-8000-0000000000e3"))
+
 	(sheet_instances
-		(path "/"
-			(page "1")
-		)
+		(path "/" (page "1"))
 	)
 )

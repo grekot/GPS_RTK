@@ -1,19 +1,28 @@
-# KiCad — projekt schematu (scaffold pod v2)
+# KiCad — projekt schematu
 
-Pliki projektu KiCad dla odbiornika GPS RTK. **To scaffold** — `gps_rtk_v1.kicad_sch`
-zawiera na razie tylko blok tytułowy i notatki tekstowe opisujące tor. Pełny schemat
-z symbolami i połączeniami rysuje się w GUI KiCada (deliverable v2).
+Pliki projektu KiCad dla odbiornika GPS RTK. `gps_rtk_v1.kicad_sch` zawiera **schemat
+blokowy** (bloki modułów + połączenia + etykiety netów), **zwalidowany i wyeksportowany**
+przez `kicad-cli 9.0.9` → [gps_rtk_v1.pdf](gps_rtk_v1.pdf) i [gps_rtk_v1.svg](gps_rtk_v1.svg).
+Pełny capture z symbolami bibliotecznymi + footprinty + ERC → v2 (rysunek w GUI).
 
 > Dla v1 (prototyp na devkitach) źródłem prawdy o połączeniach są tabele w
 > [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md) i pinout w
 > [../docs/05-pinout-firmware.md](../docs/05-pinout-firmware.md). KiCad jest potrzebny
 > dopiero, gdy będziemy projektować własne PCB.
 
-> ⚠️ Pliki `.kicad_pro`/`.kicad_sch` napisałem ręcznie, **bez lokalnego KiCada do walidacji**
-> (w środowisku brak winget/choco/scoop i samego KiCada). Format = KiCad 8 (`version 20231120`).
-> Jeśli KiCad zgłosi błąd formatu przy otwieraniu — daj znać, poprawię.
+> ✅ **Zwalidowane:** `kicad-cli 9.0.9` otwiera `gps_rtk_v1.kicad_sch` bez błędów i renderuje
+> (PDF/SVG dołączone, 9848 elementów rysunku). Format KiCad 8 (`version 20231120`) — KiCad 8/9/10
+> otworzą bez problemu.
 
-## Instalacja KiCada na Windows (brak winget w systemie)
+## Portable KiCad już rozpakowany (ta sesja)
+
+Instalator rozpakowano 7-Zipem **bez instalacji i bez praw admina** do
+`C:\TMP\kicad_portable\` — działa stamtąd zarówno **GUI** (`C:\TMP\kicad_portable\bin\kicad.exe`),
+jak i **CLI** (`C:\TMP\kicad_portable\bin\kicad-cli.exe`). Możesz otworzyć schemat od ręki:
+`& "C:\TMP\kicad_portable\bin\kicad.exe" "...\elektronika\kicad\gps_rtk_v1.kicad_pro"`.
+Folder można usunąć (~kilka GB) albo zachować jako przenośny KiCad.
+
+## Instalacja KiCada na Windows (na stałe; brak winget w systemie)
 
 Wybierz jedną drogę:
 
