@@ -20,21 +20,28 @@ i [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
 > typowe i czytelne przy gęstych wyprowadzeniach MCU. Moduły jako złącza — w v1 to i tak gotowe
 > płytki łączone przewodami. 24 nieużywane GPIO ESP32 zostają wolne (zapas).
 
-## PCB — `gps_rtk_v1.kicad_pcb`
+## PCB — carrier `gps_rtk_v1.kicad_pcb`
 
-Płytka **80 × 72 mm** wygenerowana skryptem [gen/gen_pcb.py](gen/gen_pcb.py) (pcbnew — Python KiCada):
-16 footprintów z przypisanymi netami (82 pady), obrys Edge.Cuts. Podgląd:
-**[render 3D PNG](gps_rtk_v1_pcb.png)** i [2D SVG](gps_rtk_v1_pcb.svg).
+**Płytka-baza (carrier) 100 × 78 mm**: wszystkie elementy aktywne to **gotowe moduły wpinane
+w gniazda żeńskie** (łącznie z ESP32 jako devkit). Wygenerowana [gen/gen_pcb.py](gen/gen_pcb.py)
+(pcbnew — Python KiCada). Podgląd: **[render 3D PNG](gps_rtk_v1_pcb.png)**, [2D SVG](gps_rtk_v1_pcb.svg).
 
-Footprinty: **U1** ESP32-WROOM-32; **J1–J5/BT1** listwy goldpin 2.54 mm (moduły GNSS/OLED/IMU/TP4056/
-buck + ogniwo łączone przewodami); **R/C** 0805; **D1** LED 0805; **SW1** tact 6 mm.
+Gniazda **PinSocket 2.54 mm**: **U1L+U1R** = ESP32-DevKitC (2× 1×19); **J1** GNSS LC29HEA (1×06),
+**J2** OLED (1×04), **J3** IMU v2 (1×04), **J4** buck-boost (1×04), **J5** TP4056 (1×06),
+**BT1** ogniwo (1×02, przewody). Na carrierze (SMD/THT): dzielnik **R1/R2**, pull-upy I2C **R3/R4**,
+**R5+D1** LED statusu, **C1/C2** bulk/odsprzęganie, **SW1** przycisk.
+
+**ESP32 jako devkit:** zasilanie wchodzi na pin **3V3** (z buck-boosta); **EN i 5V zostają wolne** —
+devkit ma własny układ auto-reset i LDO (podpięcie EN do 3V3 zablokowałoby programowanie!). Mapowanie
+pinów wg pinoutu **DevKitC V4 (38-pin)**. (Schemat pokazuje ESP32 jako symbol WROOM — logicznie
+równoważny; na płytce to gniazdo devkitu.)
 
 **Stan: rozmieszczona + onetowana, NIETRASOWANA** (ratsnest). DRC: **0 naruszeń**, 0 błędów
-footprintów; pozostaje **46 nierozłączonych padów = ścieżki do poprowadzenia** (normalne dla
-nietrasowanej płytki). Min. wiercenie poluzowane do 0,2 mm (przelotki pada termicznego ESP32).
+footprintów; **44 pady do połączenia = trasowanie**.
 
-> Rozmieszczenie jest **zgrubne** (automatyczne, na siatce) — w GUI dociągnij je pod czytelne,
-> krótkie trasy (zwłaszcza zasilanie i ewentualny tor RF).
+> ⚠️ **Zweryfikuj w GUI pod swój devkit:** rozstaw rzędów gniazd ESP32 (przyjąłem **22,86 mm / 0,9″**)
+> oraz pinout (DevKitC V4). Inny devkit (np. 30-pin) → w `gen_pcb.py` zmień gniazda na 1×15 i mapę
+> `ESP_L`/`ESP_R`. Rozmieszczenie zgrubne — dociągnij w GUI pod krótkie trasy.
 
 ## Weryfikacja (bez ERC — patrz niżej)
 
