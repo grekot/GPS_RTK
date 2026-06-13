@@ -20,7 +20,7 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
 | [docs/06-mechanika.md](docs/06-mechanika.md) | obudowa, gwint 5/8"-11, antena + ground plane, IP65 | 5 |
 | [docs/07-programowanie-debug.md](docs/07-programowanie-debug.md) | toolchain, flashowanie, test toru SPP→BLE | 6 |
 | [datasheety/README.md](datasheety/README.md) | linki do kart katalogowych | — |
-| [kicad/](kicad/) | **pełny schemat** KiCad (symbole + nety) + [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg), zweryfikowany netlistą | 1/7 |
+| [kicad/](kicad/) | **pełny schemat** + **PCB** (rozmieszczona, DRC 0 naruszeń, nietrasowana): [schemat PDF](kicad/gps_rtk_v1.pdf), [PCB 3D](kicad/gps_rtk_v1_pcb.png) | 1/7 |
 
 ## Stan projektu
 
@@ -43,4 +43,6 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
 > **KiCad:** [kicad/](kicad/) — **pełny schemat** `gps_rtk_v1.kicad_sch` (prawdziwe symbole +
 > połączenia po netach) + eksport [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg),
 > **zweryfikowany netlistą** (`kicad-cli`). Generator: [kicad/gen/gen_schematic.py](kicad/gen/gen_schematic.py).
-> v2 = footprinty + PCB. Portable KiCad (GUI+CLI) w `C:\TMP\kicad_portable` (zob. [kicad/README.md](kicad/README.md)).
+> **PCB** rozmieszczona + onetowana (DRC **0 naruszeń**, nietrasowana): [render 3D](kicad/gps_rtk_v1_pcb.png),
+> generator [gen_pcb.py](kicad/gen/gen_pcb.py) — zostaje trasowanie. Portable KiCad (GUI+CLI) w
+> `C:\TMP\kicad_portable` (zob. [kicad/README.md](kicad/README.md)).

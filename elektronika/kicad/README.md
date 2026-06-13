@@ -20,6 +20,22 @@ i [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
 > typowe i czytelne przy gęstych wyprowadzeniach MCU. Moduły jako złącza — w v1 to i tak gotowe
 > płytki łączone przewodami. 24 nieużywane GPIO ESP32 zostają wolne (zapas).
 
+## PCB — `gps_rtk_v1.kicad_pcb`
+
+Płytka **80 × 72 mm** wygenerowana skryptem [gen/gen_pcb.py](gen/gen_pcb.py) (pcbnew — Python KiCada):
+16 footprintów z przypisanymi netami (82 pady), obrys Edge.Cuts. Podgląd:
+**[render 3D PNG](gps_rtk_v1_pcb.png)** i [2D SVG](gps_rtk_v1_pcb.svg).
+
+Footprinty: **U1** ESP32-WROOM-32; **J1–J5/BT1** listwy goldpin 2.54 mm (moduły GNSS/OLED/IMU/TP4056/
+buck + ogniwo łączone przewodami); **R/C** 0805; **D1** LED 0805; **SW1** tact 6 mm.
+
+**Stan: rozmieszczona + onetowana, NIETRASOWANA** (ratsnest). DRC: **0 naruszeń**, 0 błędów
+footprintów; pozostaje **46 nierozłączonych padów = ścieżki do poprowadzenia** (normalne dla
+nietrasowanej płytki). Min. wiercenie poluzowane do 0,2 mm (przelotki pada termicznego ESP32).
+
+> Rozmieszczenie jest **zgrubne** (automatyczne, na siatce) — w GUI dociągnij je pod czytelne,
+> krótkie trasy (zwłaszcza zasilanie i ewentualny tor RF).
+
 ## Weryfikacja (bez ERC — patrz niżej)
 
 - ✅ **Netlista** (`kicad-cli sch export netlist`) — przeszła; każdy net ma dokładnie właściwe węzły
@@ -29,10 +45,12 @@ i [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
   z silnikiem ERC w kicad-cli 9.0.9). Dlatego poprawność połączeń potwierdziłem **netlistą**, nie ERC.
   Po otwarciu i zapisaniu pliku w **GUI KiCada** (które normalizuje format) ERC powinien działać.
 
-## Do zrobienia w v2 (PCB)
+## Dalej (trasowanie + produkcja)
 
-- Przypisać **footprinty** do symboli, uruchomić **ERC** w GUI, wygenerować **PCB**.
-- Sekcja RF/bias anteny dla gołego modułu (jeśli nie gotowa płytka) — patrz [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
+- **Trasowanie ścieżek** — jedyny brakujący krok: w GUI pcbnew, albo autorouterem **freerouting**
+  (eksport `.dsn` → route → import `.ses`). Warto **wylać masę (GND pour)** — skróci ratsnest.
+- Po trasowaniu: DRC w GUI, **gerbery** (`kicad-cli pcb export gerbers`), plik wierceń, BOM/CPL.
+- Sekcja RF/bias anteny dla gołego modułu — patrz [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
 
 ## Regeneracja / eksport
 
@@ -42,6 +60,10 @@ py -3 gen\gen_schematic.py                          # wymaga: pip install kiutil
 & $cli sch export pdf     --output gps_rtk_v1.pdf gps_rtk_v1.kicad_sch
 & $cli sch export svg     --output .               gps_rtk_v1.kicad_sch
 & $cli sch export netlist --output gps_rtk_v1.net  gps_rtk_v1.kicad_sch
+# PCB (pcbnew — Python KiCada):
+& "C:\TMP\kicad_portable\bin\python.exe" gen\gen_pcb.py
+& $cli pcb drc    --output pcb.drc.rpt        gps_rtk_v1.kicad_pcb
+& $cli pcb render --output gps_rtk_v1_pcb.png gps_rtk_v1.kicad_pcb
 ```
 
 ## Portable KiCad (rozpakowany w tej sesji)
