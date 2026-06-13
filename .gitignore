@@ -3,6 +3,10 @@ firmware/.pio/
 app/build/
 app/.dart_tool/
 
+# Python (generatory KiCad)
+__pycache__/
+*.pyc
+
 # IDE / system
 .vscode/
 *.tmp

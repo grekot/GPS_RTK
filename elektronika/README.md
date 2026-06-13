@@ -20,7 +20,7 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
 | [docs/06-mechanika.md](docs/06-mechanika.md) | obudowa, gwint 5/8"-11, antena + ground plane, IP65 | 5 |
 | [docs/07-programowanie-debug.md](docs/07-programowanie-debug.md) | toolchain, flashowanie, test toru SPP→BLE | 6 |
 | [datasheety/README.md](datasheety/README.md) | linki do kart katalogowych | — |
-| [kicad/](kicad/) | schemat blokowy KiCad + eksport [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg) (zwalidowany kicad-cli 9.0.9) | 1/7 |
+| [kicad/](kicad/) | **pełny schemat** KiCad (symbole + nety) + [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg), zweryfikowany netlistą | 1/7 |
 
 ## Stan projektu
 
@@ -40,7 +40,7 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
 4. Firmware BLE NUS → integracja z `../app/lib/sources/ble_receiver_source.dart`.
 5. (v2) KiCad + PCB + obudowa + IMU BNO085.
 
-> **KiCad:** [kicad/](kicad/) — schemat blokowy `gps_rtk_v1.kicad_sch` + eksport
-> [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg), zwalidowany `kicad-cli 9.0.9`.
-> Pełny capture z symbolami → v2. Portable KiCad (GUI+CLI) rozpakowany w `C:\TMP\kicad_portable`
-> (szczegóły w [kicad/README.md](kicad/README.md)).
+> **KiCad:** [kicad/](kicad/) — **pełny schemat** `gps_rtk_v1.kicad_sch` (prawdziwe symbole +
+> połączenia po netach) + eksport [PDF](kicad/gps_rtk_v1.pdf)/[SVG](kicad/gps_rtk_v1.svg),
+> **zweryfikowany netlistą** (`kicad-cli`). Generator: [kicad/gen/gen_schematic.py](kicad/gen/gen_schematic.py).
+> v2 = footprinty + PCB. Portable KiCad (GUI+CLI) w `C:\TMP\kicad_portable` (zob. [kicad/README.md](kicad/README.md)).
