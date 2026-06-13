@@ -1,0 +1,94 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "a1b2c3d4-0000-4000-8000-000000000001")
+	(paper "A3")
+	(title_block
+		(title "Odbiornik GPS RTK - v1 (prototyp devkit)")
+		(date "2026-06-13")
+		(rev "v1")
+		(company "Projekt GPS_RTK")
+		(comment 1 "Scaffold - uzupelnic symbolami w KiCad (v2)")
+		(comment 2 "Polaczenia: elektronika/docs/02-schemat-polaczen.md")
+		(comment 3 "Pinout/protokol BLE: elektronika/docs/05-pinout-firmware.md")
+	)
+	(lib_symbols)
+	(text "ODBIORNIK GPS RTK - schemat blokowy v1 (scaffold)"
+		(exclude_from_sim no)
+		(at 25 30 0)
+		(effects
+			(font (size 3 3) (bold yes))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000010")
+	)
+	(text "Tor sygnalu: Antena L1/L5 -> LC29HEA -> ESP32-WROOM (UART2 GPIO16 RX / GPIO17 TX) -> BLE NUS -> Smartfon (NTRIP) -> ASG-EUPOS"
+		(exclude_from_sim no)
+		(at 25 45 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000011")
+	)
+	(text "UART 3.3 V, 115200 (-> 460800): NMEA w gore, RTCM w dol, ten sam port. Oba uklady 3.3 V - bez konwersji poziomow."
+		(exclude_from_sim no)
+		(at 25 53 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000012")
+	)
+	(text "I2C (GPIO21 SDA / GPIO22 SCL): OLED SSD1306 0x3C + rezerwa IMU BNO085 0x4A (v2)."
+		(exclude_from_sim no)
+		(at 25 61 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000013")
+	)
+	(text "Zasilanie: 18650 -> TP4056 (USB-C, ochrona DW01A) -> buck-boost 3.3 V -> ESP32 + GNSS + OLED. Bulk 100-470 uF na szynie."
+		(exclude_from_sim no)
+		(at 25 69 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000014")
+	)
+	(text "Bateria: dzielnik 100k/100k -> GPIO34 (ADC1). LED status: GPIO2. Przycisk: GPIO27. PPS: GPIO35 (opc). RESET GNSS: GPIO4 (opc)."
+		(exclude_from_sim no)
+		(at 25 77 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000015")
+	)
+	(text "BLE NUS: TX 6E400003 (NMEA notify), RX 6E400002 (RTCM write), status 6E400004 (JSON, Read+Notify). MTU 247."
+		(exclude_from_sim no)
+		(at 25 85 0)
+		(effects
+			(font (size 2 2))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000016")
+	)
+	(text "UWAGA: to tylko scaffold (tekst). Pelny schemat z symbolami i polaczeniami narysuj w KiCad wg docs/02 i docs/05 (v2)."
+		(exclude_from_sim no)
+		(at 25 100 0)
+		(effects
+			(font (size 2.2 2.2) (italic yes))
+			(justify left bottom)
+		)
+		(uuid "a1b2c3d4-0000-4000-8000-000000000017")
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)
