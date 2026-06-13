@@ -26,21 +26,43 @@ i [../docs/02-schemat-polaczen.md](../docs/02-schemat-polaczen.md).
 w gniazda żeńskie** (łącznie z ESP32 jako devkit). Wygenerowana [gen/gen_pcb.py](gen/gen_pcb.py)
 (pcbnew — Python KiCada). Podgląd: **[render 3D PNG](gps_rtk_v1_pcb.png)**, [2D SVG](gps_rtk_v1_pcb.svg).
 
-Gniazda **PinSocket 2.54 mm**: **U1L+U1R** = ESP32-DevKitC (2× 1×19); **J1** GNSS LC29HEA (1×06),
-**J2** OLED (1×04), **J3** IMU v2 (1×04), **J4** buck-boost (1×04), **J5** TP4056 (1×06),
-**BT1** ogniwo (1×02, przewody). Na carrierze (SMD/THT): dzielnik **R1/R2**, pull-upy I2C **R3/R4**,
-**R5+D1** LED statusu, **C1/C2** bulk/odsprzęganie, **SW1** przycisk.
+Gniazda **PinSocket 2.54 mm**: **U1L+U1R** = ESP32 **DOIT DevKit V1 (30-pin)**, 2× **1×15**;
+**J1** GNSS LC29HEA (1×06), **J2** OLED (1×04), **J3** IMU v2 (1×04), **J4** buck-boost (1×04),
+**J5** TP4056 (1×06), **BT1** ogniwo (1×02). Na carrierze (SMD/THT): dzielnik **R1/R2**,
+pull-upy I2C **R3/R4**, **R5+D1** LED, **C1/C2** bulk/odsprzęg., **SW1** przycisk.
 
-**ESP32 jako devkit:** zasilanie wchodzi na pin **3V3** (z buck-boosta); **EN i 5V zostają wolne** —
-devkit ma własny układ auto-reset i LDO (podpięcie EN do 3V3 zablokowałoby programowanie!). Mapowanie
-pinów wg pinoutu **DevKitC V4 (38-pin)**. (Schemat pokazuje ESP32 jako symbol WROOM — logicznie
-równoważny; na płytce to gniazdo devkitu.)
+**ESP32 jako devkit:** 3.3 V wchodzi na pin **3V3**; **EN i VIN(5V) wolne** — devkit ma własny
+auto-reset i LDO (podpięcie EN do 3V3 zablokowałoby programowanie!). (Schemat pokazuje ESP32 jako
+symbol WROOM — logicznie równoważny; na płytce to gniazdo devkitu.)
+
+### Pinout ESP32 użyty na płytce — ZWERYFIKUJ z nadrukiem swojej płytki!
+
+Kolejność fizyczna góra→dół (DOIT DevKit V1 30-pin). **Pogrubione = podłączone (mają net):**
+
+| U1L (lewa) | net | · | U1R (prawa) | net |
+|---|---|---|---|---|
+| 1 EN | — | · | 1 3V3 | **+3V3** |
+| 2 IO36 | — | · | 2 GND | **GND** |
+| 3 IO39 | — | · | 3 IO15 | — |
+| **4 IO34** | **VBAT_SENSE** | · | **4 IO2** | **LED_STAT** |
+| **5 IO35** | **GNSS_PPS** | · | **5 IO4** | **GNSS_RST** |
+| 6 IO32 | — | · | **6 IO16** | **GNSS_TX** |
+| 7 IO33 | — | · | **7 IO17** | **GNSS_RX** |
+| 8 IO25 | — | · | 8 IO5 | — |
+| 9 IO26 | — | · | 9 IO18 | — |
+| **10 IO27** | **BTN** | · | 10 IO19 | — |
+| 11 IO14 | — | · | **11 IO21** | **SDA** |
+| 12 IO12 | — | · | 12 IO3 | — |
+| 13 IO13 | — | · | 13 IO1 | — |
+| **14 GND** | **GND** | · | **14 IO22** | **SCL** |
+| 15 VIN | — | · | 15 IO23 | — |
 
 **Stan: rozmieszczona + onetowana, NIETRASOWANA** (ratsnest). DRC: **0 naruszeń**, 0 błędów
-footprintów; **44 pady do połączenia = trasowanie**.
+footprintów; **43 pady do połączenia = trasowanie**.
 
-> ⚠️ **Zweryfikuj w GUI pod swój devkit:** rozstaw rzędów gniazd ESP32 (przyjąłem **22,86 mm / 0,9″**)
-> oraz pinout (DevKitC V4). Inny devkit (np. 30-pin) → w `gen_pcb.py` zmień gniazda na 1×15 i mapę
+> ⚠️ **Zweryfikuj pod swój egzemplarz:** (1) **rozstaw rzędów** gniazd ESP32 — przyjąłem **22,86 mm**
+> (stała `ESP_ROW_MM` w [gen/gen_pcb.py](gen/gen_pcb.py)); zmierz środek-do-środka rzędów i popraw.
+> (2) **Pinout** wg tabeli wyżej — klony 30-pin bywają różne; jeśli się różni, popraw listy
 > `ESP_L`/`ESP_R`. Rozmieszczenie zgrubne — dociągnij w GUI pod krótkie trasy.
 
 ## Weryfikacja (bez ERC — patrz niżej)
