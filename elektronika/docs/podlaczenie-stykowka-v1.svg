@@ -1,0 +1,118 @@
+<svg viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ti de" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title id="ti">Schemat połączeń na płytce stykowej v1</title>
+  <desc id="de">ESP32 DevKit V1 30-pin zasilany z powerbanku przez USB; moduł GPS LC29HEA po UART (TX→IO16, RX←IO17); OLED SSD1306 po I2C (SDA IO21, SCL IO22); szyny +3V3 i GND jak na płytce stykowej; opcjonalnie PPS/RST, LED na IO2 i przycisk na IO27.</desc>
+  <style>
+    .bg{fill:#ffffff;stroke:#d4d4d8;stroke-width:1.5}
+    .mod{fill:#f1f5f9;stroke:#475569;stroke-width:1.6;rx:8}
+    .ti{fill:#0f172a;font-size:13px;font-weight:700}
+    .st{fill:#64748b;font-size:10px}
+    .pin{fill:#1e293b;font-size:10px;font-family:ui-monospace,monospace}
+    .lab{fill:#475569;font-size:9.5px;font-family:ui-monospace,monospace}
+    .h1{fill:#0f172a;font-size:15px;font-weight:700}
+    .leg{fill:#334155;font-size:10.5px}
+    .w3v3{stroke:#dc2626;stroke-width:2.2;fill:none}
+    .wgnd{stroke:#334155;stroke-width:2.2;fill:none}
+    .wusb{stroke:#f59e0b;stroke-width:2.2;fill:none}
+    .wuart{stroke:#2563eb;stroke-width:2.2;fill:none}
+    .wi2c{stroke:#16a34a;stroke-width:2.2;fill:none}
+    .wopt{stroke:#94a3b8;stroke-width:1.8;fill:none;stroke-dasharray:5 4}
+    .dot{fill:#334155}
+  </style>
+
+  <rect class="bg" x="8" y="8" width="884" height="584" rx="10"/>
+  <text class="h1" x="26" y="34">Połączenia na płytce stykowej — v1 (zasilanie z powerbanku)</text>
+
+  <line class="w3v3" x1="70" y1="92" x2="832" y2="92"/>
+  <text class="lab" x="70" y="86" fill="#dc2626" font-weight="700">szyna +3V3  (z pinu 3V3 ESP32)</text>
+  <line class="wgnd" x1="70" y1="556" x2="832" y2="556"/>
+  <text class="lab" x="70" y="572" fill="#334155" font-weight="700">szyna GND</text>
+
+  <rect class="mod" x="26" y="120" width="150" height="54" rx="8"/>
+  <text class="ti" x="36" y="143">Powerbank</text>
+  <text class="st" x="36" y="160">5 V, wyjście USB-A</text>
+
+  <rect class="mod" x="362" y="150" width="200" height="356" rx="8"/>
+  <text class="ti" x="402" y="176">ESP32 DevKit V1</text>
+  <text class="st" x="402" y="192">30-pin (DOIT)</text>
+  <text class="pin" x="368" y="222">USB 5V</text>
+  <text class="pin" x="368" y="252">3V3</text>
+  <text class="pin" x="368" y="282">GND</text>
+  <text class="pin" x="368" y="322">IO16 (RX2)</text>
+  <text class="pin" x="368" y="352">IO17 (TX2)</text>
+  <text class="pin" x="368" y="412">IO35</text>
+  <text class="pin" x="368" y="442">IO4</text>
+  <text class="pin" x="556" y="322" text-anchor="end">IO21 (SDA)</text>
+  <text class="pin" x="556" y="352" text-anchor="end">IO22 (SCL)</text>
+  <text class="pin" x="556" y="432" text-anchor="end">IO2</text>
+  <text class="pin" x="556" y="472" text-anchor="end">IO27</text>
+
+  <rect class="mod" x="70" y="226" width="170" height="210" rx="8"/>
+  <text class="ti" x="80" y="249">Moduł GPS</text>
+  <text class="st" x="80" y="265">LC29HEA</text>
+  <text class="lab" x="80" y="300" fill="#0f172a">↖ antena L1/L5</text>
+  <text class="lab" x="80" y="313" fill="#64748b">+ ground plane Ø10–12cm</text>
+  <text class="pin" x="232" y="345" text-anchor="end">VCC</text>
+  <text class="pin" x="232" y="368" text-anchor="end">GND</text>
+  <text class="pin" x="232" y="391" text-anchor="end">TX</text>
+  <text class="pin" x="232" y="414" text-anchor="end">RX</text>
+
+  <rect class="mod" x="660" y="226" width="170" height="150" rx="8"/>
+  <text class="ti" x="724" y="249">OLED</text>
+  <text class="st" x="690" y="265">SSD1306 (I2C, 3.3V)</text>
+  <text class="pin" x="668" y="300">VCC</text>
+  <text class="pin" x="668" y="323">GND</text>
+  <text class="pin" x="668" y="346">SDA</text>
+  <text class="pin" x="668" y="369">SCL</text>
+
+  <rect x="610" y="420" width="34" height="16" rx="3" fill="#fde68a" stroke="#b45309"/>
+  <text class="lab" x="627" y="432" text-anchor="middle">330Ω</text>
+  <path d="M662,428 l14,-7 v14 z" fill="#ef4444" stroke="#b91c1c"/>
+  <text class="lab" x="690" y="432">LED stanu</text>
+  <text class="lab" x="610" y="452" fill="#64748b">(albo wbudowana LED na IO2)</text>
+  <rect x="610" y="462" width="26" height="16" rx="3" fill="#e2e8f0" stroke="#475569"/>
+  <text class="lab" x="623" y="474" text-anchor="middle">SW</text>
+  <text class="lab" x="644" y="474">przycisk (opc., pull-up wewn.)</text>
+
+  <polyline class="wusb" points="176,147 270,147 270,213 360,213"/>
+  <text class="lab" x="200" y="140" fill="#b45309">USB 5 V</text>
+
+  <polyline class="w3v3" points="362,248 344,248 344,92"/>
+  <polyline class="w3v3" points="240,341 256,341 256,92"/>
+  <polyline class="w3v3" points="660,296 644,296 644,92"/>
+  <polyline class="wgnd" points="362,278 332,278 332,556"/>
+  <polyline class="wgnd" points="240,364 300,364 300,556"/>
+  <polyline class="wgnd" points="660,319 620,319 620,520 690,520 690,556"/>
+
+  <polyline class="wuart" points="240,388 300,388 300,318 360,318"/>
+  <text class="lab" x="246" y="383" fill="#1d4ed8">TX → IO16  (NMEA ↑)</text>
+  <polyline class="wuart" points="240,411 320,411 320,348 360,348"/>
+  <text class="lab" x="246" y="406" fill="#1d4ed8">RX ← IO17  (RTCM ↓)</text>
+
+  <polyline class="wopt" points="240,300 340,300 340,408 360,408"/>
+  <polyline class="wopt" points="252,313 352,313 352,438 360,438"/>
+  <text class="lab" x="300" y="455" fill="#94a3b8">PPS→IO35, RST→IO4 (opcjonalne)</text>
+
+  <polyline class="wi2c" points="660,342 600,342 600,318 562,318"/>
+  <text class="lab" x="575" y="312" fill="#15803d" text-anchor="end">SDA·IO21</text>
+  <polyline class="wi2c" points="660,365 588,365 588,348 562,348"/>
+  <text class="lab" x="575" y="372" fill="#15803d" text-anchor="end">SCL·IO22</text>
+
+  <polyline class="wgnd" points="562,428 610,428"/>
+  <polyline class="wgnd" points="676,428 740,428 740,556"/>
+  <polyline class="wgnd" points="562,468 610,468"/>
+  <polyline class="wgnd" points="636,470 660,470 660,556"/>
+
+  <circle class="dot" cx="344" cy="92" r="3"/><circle class="dot" cx="256" cy="92" r="3"/><circle class="dot" cx="644" cy="92" r="3"/>
+  <circle class="dot" cx="332" cy="556" r="3"/><circle class="dot" cx="300" cy="556" r="3"/><circle class="dot" cx="690" cy="556" r="3"/><circle class="dot" cx="740" cy="556" r="3"/><circle class="dot" cx="660" cy="556" r="3"/>
+
+  <g transform="translate(26,520)">
+    <rect x="0" y="-8" width="18" height="4" fill="#dc2626"/><text class="leg" x="24" y="-2">+3V3</text>
+    <rect x="78" y="-8" width="18" height="4" fill="#334155"/><text class="leg" x="102" y="-2">GND</text>
+    <rect x="150" y="-8" width="18" height="4" fill="#f59e0b"/><text class="leg" x="174" y="-2">USB 5V</text>
+    <rect x="240" y="-8" width="18" height="4" fill="#2563eb"/><text class="leg" x="264" y="-2">UART</text>
+    <rect x="320" y="-8" width="18" height="4" fill="#16a34a"/><text class="leg" x="344" y="-2">I2C</text>
+    <rect x="380" y="-8" width="18" height="4" fill="#94a3b8"/><text class="leg" x="404" y="-2">opcja</text>
+  </g>
+
+  <text class="st" x="26" y="588" fill="#0f172a">Minimum do RTK: ESP32 + GPS (VCC, GND, TX→IO16, RX←IO17) + powerbank.  OLED/LED/przycisk — opcjonalne.</text>
+</svg>
