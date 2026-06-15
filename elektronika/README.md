@@ -30,7 +30,7 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
   ESP32 = „głupi most" UART↔BLE. Nie zmieniać bez uzgodnienia.
 - **Moduł GNSS (podstawowy):** breakout **LC29HEA + antena z AliExpress** (~197 zł, wariant EA).
   Alternatywy: MikroE GNSS RTK 3 Click (premium), Waveshare LC29H(DA) (PL od ręki, ale 1 Hz).
-- **Zasilanie:** 18650 → TP4056 (USB-C) → buck-boost 3.3 V.
+- **Zasilanie (v1 start):** powerbank przez **USB devkitu ESP32**; sekcja bateryjna (18650 → TP4056 → buck-boost 3.3 V) = opcja terenowa/v2 (nie montowana w v1).
 
 ## Następne kroki
 

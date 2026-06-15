@@ -35,6 +35,10 @@ pull-upy I2C **R3/R4**, **R5+D1** LED, **C1/C2** bulk/odsprzęg., **SW1** przyci
 auto-reset i LDO (podpięcie EN do 3V3 zablokowałoby programowanie!). (Schemat pokazuje ESP32 jako
 symbol WROOM — logicznie równoważny; na płytce to gniazdo devkitu.)
 
+> **Zasilanie v1 = powerbank przez USB devkitu** (decyzja użytkownika). W tym trybie **nie montuj**
+> modułów zasilania: buck-boost (J4), TP4056 (J5), ogniwo (BT1) ani dzielnika baterii (R1/R2) — szynę
+> **+3V3** napędza wtedy AMS1117 devkitu. Sekcja bateryjna zostaje na płytce jako **opcja terenowa/v2**.
+
 ### Pinout ESP32 użyty na płytce — ZWERYFIKUJ z nadrukiem swojej płytki!
 
 Kolejność fizyczna góra→dół (DOIT DevKit V1 30-pin). **Pogrubione = podłączone (mają net):**

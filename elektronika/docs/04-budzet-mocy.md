@@ -4,6 +4,11 @@
 > w researchu, więc liczby pochodzą ze streszczeń/forów. Oznaczone `[~]`. Zweryfikuj na sprzęcie
 > miernikiem przed projektem PCB v2. Komponenty: [03-BOM.md](03-BOM.md).
 
+> **Zasilanie v1 (start, decyzja D6): powerbank przez USB devkitu ESP32** — 5 V → AMS1117 (na devkicie)
+> → 3V3 → ESP32 + GPS + OLED. Poniższy budżet **baterii** dotyczy **opcji terenowej/v2** (18650 + buck-boost).
+> Na powerbanku uwaga na **auto-wyłączanie** przy małym poborze (~<50–75 mA) — nasz pobór ~150–250 mA
+> zwykle utrzymuje go włączonym; jeśli gaśnie, użyj powerbanku bez auto-off.
+
 ## 1. Pobór prądu @ 3.3 V
 
 | Element | Tryb | Prąd | Pewność |

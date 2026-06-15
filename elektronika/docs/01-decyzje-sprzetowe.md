@@ -10,9 +10,10 @@
 |---|---|---|---|
 | D1 | Zakres v1 | **Prototyp na devkitach / płytce stykowej** — pełna dokumentacja do złożenia, bez projektu PCB w tej fazie (PCB → v2) | użytkownik |
 | D2 | Moduł GNSS | **Breakout LC29HEA + antena z AliExpress (~197 zł)** jako podstawowy; **MikroE GNSS RTK 3 Click (LC29HEA)** jako wariant premium; **Waveshare LC29H(DA)** jako wariant z PL od ręki (wszystkie drop-in) | użytkownik wskazał konkretny moduł AliExpress |
-| D3 | Zasilanie | **1× 18650 → TP4056 (ładowanie USB-C, z zabezpieczeniem) → przetwornica buck-boost 3.3 V** zasilająca całość | użytkownik |
+| D3 | Zasilanie (terenowe) | **1× 18650 → TP4056 (USB-C, z zabezpieczeniem) → buck-boost 3.3 V** — **opcja terenowa/v2** (patrz D6) | użytkownik |
 | D4 | Urządzenia I2C | **OLED SSD1306** w v1 + **zarezerwowane miejsce/pady pod IMU BNO085** (montaż w v2) | użytkownik |
-| D5 | USB-C | v1: programowanie przez **USB devkita** (mostek CP2102/CH340 na płytce), USB-C TP4056 **tylko do ładowania**. v2: zintegrowany CP2102 na USB-C | agent (wynika z D1) |
+| D5 | USB-C | v1: programowanie przez **USB devkita** (mostek CP2102/CH340 na płytce). v2: zintegrowany CP2102 na USB-C | agent (wynika z D1) |
+| D6 | Zasilanie v1 (start) | **Powerbank przez USB devkitu ESP32** (5 V → AMS1117 → 3V3 → ESP32 + GPS + OLED). Sekcja bateryjna (D3) **nie montowana w v1**. Pułapka: część powerbanków ma auto-wyłączanie przy małym poborze | użytkownik |
 
 ## 2. Kluczowe ustalenie: wariant LC29H — DA vs EA
 
