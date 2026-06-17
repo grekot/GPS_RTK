@@ -48,17 +48,29 @@ Szyny zasilania jak na stykówce: **+3V3** (z pinu 3V3 devkitu) i **GND**.
 
 ## Uwagi (ważne)
 
-- **Napięcie 3.3 V** — GPS i OLED zasilaj z pinu **3V3** devkitu. **Nigdy 5 V** na VCC modułu GPS ani
-  na piny UART (LC29HEA nie jest 5 V-tolerant).
+- **Napięcie** — GPS i OLED zasilaj z pinu **3V3** devkitu. Zamówiona płytka GPS jest wg instrukcji
+  **3.3 V/5 V kompatybilna**, ale z ESP32 (3.3 V) łączymy na **3.3 V**; OLED zawsze 3.3 V.
+- **Przełączniki na płytce GPS** — 2 suwaki: **oba w LEWO = UART (goldpiny)** → praca z ESP32;
+  **oba w PRAWO = USB-C (Type-C)** → bezpośrednio do PC/telefonu. Do stykówki z ESP32 ustaw **UART**.
 - **Wspólna masa** — wszystkie GND razem (devkit, GPS, OLED). Bez tego UART/I2C nie działają.
 - **Powerbank: auto-wyłączanie** — wiele powerbanków gaśnie przy małym poborze; nasz ~150–250 mA zwykle
   go utrzyma, ale jak gaśnie, użyj powerbanku bez auto-off.
 - **LED** — na większości devkitów jest **wbudowana LED na IO2 (D2)**, więc zewnętrzna jest opcjonalna.
 - **Pull-upy I2C** — gotowe moduły OLED zwykle mają je na pokładzie; dodaj 4,7 kΩ (SDA/SCL→3V3) tylko gdy brak.
-- **UART baud** — firmware używa **460800** (domyślny LC29HEA EA); ustaw tyle w monitorze/aplikacji.
-- **Antena** — podłącz aktywną antenę L1/L5 do złącza modułu GPS; **ground plane Ø10–12 cm**; odkryte niebo.
+- **UART baud** — **115200** (domyślny dla zamówionej płytki, wg instrukcji); ustaw 115200 w monitorze/aplikacji i `GNSS_BAUD` firmware (goły moduł EA bywa 460800 — tu 115200).
+- **Antena** — **w zestawie z płytką** (aktywna, SMA); do RTK użyj L1/L5; dołóż **ground plane Ø10–12 cm**; odkryte niebo.
 - **Pinout 30-pin** — sprawdź oznaczenia ze srebrnym nadrukiem swojej płytki (tabela w [../kicad/README.md](../kicad/README.md));
   klony DevKit V1 bywają różne.
+
+## Wariant: szybki test po USB (bez ESP32)
+
+Płytka GPS ma USB-C — ustaw oba przełączniki w **PRAWO (Type-C)** i podłącz:
+- **PC:** **QGNSS** (lub u-center), port COM, baud **115200** → NMEA; klient NTRIP w QGNSS → RTK Fixed.
+- **Android:** OTG + **SW Maps / Lefebure**, USB-serial, 115200 → NMEA; NTRIP (ASG-EUPOS) → RTK.
+- **iOS:** brak (USB-serial niewspierane) — tam tylko BLE przez ESP32.
+
+Pozwala zwalidować moduł, antenę i konto NTRIP **zanim** podłączysz ESP32. Do pracy z ESP32
+przełącz suwaki w **LEWO (UART)**.
 
 ## Kolejność uruchamiania
 

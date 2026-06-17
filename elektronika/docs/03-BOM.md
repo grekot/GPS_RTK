@@ -15,6 +15,11 @@
 > ⚠️ Na AliExpress jedna oferta sprzedaje warianty Aa/Da/Ea/Ba/Bs — **wybierz EA**. Potwierdź
 > zakres VCC i logikę **3.3 V**. Bias anteny na gnieździe RF — zweryfikuj (warunek anteny aktywnej).
 
+> ✅ **Zamówiona płytka** (instrukcja: [../datasheety/LC29H-mozi-board-manual-CN.pdf](../datasheety/LC29H-mozi-board-manual-CN.pdf)):
+> LC29H rover RTK, **SMA + antena w zestawie**, **USB-C + UART** (2 przełączniki Type-C↔goldpiny),
+> **3.3 V/5 V** kompatybilna, **baud 115200**, bateria podtrzymująca efemerydy, RTK Fixed ~2,5 cm.
+> Można jej użyć **bezpośrednio po USB** (PC/Android) — patrz [08-podlaczenie-stykowka.md](08-podlaczenie-stykowka.md).
+
 ## 2. Antena L1/L5 (jeśli nie w zestawie z modułem)
 
 | Pozycja | Produkt | Złącze | Cena | Gdzie |

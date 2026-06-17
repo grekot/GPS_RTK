@@ -34,9 +34,9 @@ GPIO5, GPIO6–11 (SPI flash). GPIO2 użyte na LED świadomie, z zachowaniem reg
 
 | Parametr | Wartość | Uwaga |
 |---|---|---|
-| Baud | **460800** (domyślny EA) | firmware ma `GNSS_BAUD=460800`; fallback 115200 gdyby brak NMEA. Moduł do 3 Mbaud. |
+| Baud | **115200** (zamówiona płytka, wg instrukcji) | ⚠️ instrukcja kupionej płytki podaje domyślny **115200** — firmware ustaw `GNSS_BAUD=115200` (goły moduł EA bywa 460800; moduł do 3 Mbaud). |
 | Format | 8N1 | |
-| Logika | **3.3 V** | **NIE 5 V-tolerant** (VIHmax ≈ 3.08 V). ESP32 też 3.3 V → łączenie wprost OK. |
+| Logika | **3.3 V** | Goły chip LC29HEA nie jest 5 V-tolerant, ale **zamówiona płytka jest 3.3 V/5 V kompatybilna** (obsługa poziomów). Z ESP32 i tak używamy 3.3 V. |
 | NMEA (wyjście) | GGA, RMC, VTG, GSA, GSV, GLL | wybór przez `$PAIR062` (Type 0–5). **Brak GST na EA!** GGA=pozycja/fix, RMC/VTG=COG. |
 | Dokładność | (brak GST) | szacuj z fixType+HDOP; opcjonalnie proprietarne `$PQTMEPE`, jeśli w strumieniu — patrz §6. |
 | Fix rate | 1 Hz (domyślnie) / 10 Hz | `$PAIR050` na EA tylko 100 ms (10 Hz) lub 1000 ms (1 Hz); zmiana działa **po restarcie** modułu. |

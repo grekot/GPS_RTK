@@ -5,6 +5,9 @@ producentów blokuje pobieranie skryptowe — otwórz w przeglądarce.
 
 ## Moduł GNSS — Quectel LC29H(EA/DA)
 
+- **[Instrukcja ZAMÓWIONEJ płytki — LC29H „Mozi" (CN)](LC29H-mozi-board-manual-CN.pdf)** — lokalna kopia z aukcji.
+  Kluczowe: rover RTK, **SMA + antena w zestawie**, **USB-C + UART** (2 przełączniki: Type-C ↔ goldpiny),
+  **3.3 V/5 V** kompatybilna, **baud 115200**, bateria podtrzymująca efemerydy, RTK Fixed ~2,5 cm.
 - LC29H Series GNSS Specification — https://www.quectel.com/product/gnss-lc29h/
   (mirror Mouser: https://www.mouser.com/datasheet/2/1052/Quectel_LC29H_Series_GNSS_Specification_V1_3-3009838.pdf)
 - LC29H Series Hardware Design (bias anteny — Figure 17, VDD_RF) —
