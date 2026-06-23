@@ -20,6 +20,7 @@ Aplikacja mobilna — osobna sesja (`../app/`). Kontekst produktu: [`../PROJEKT.
 | [docs/06-mechanika.md](docs/06-mechanika.md) | obudowa, gwint 5/8"-11, antena + ground plane, IP65 | 5 |
 | [docs/07-programowanie-debug.md](docs/07-programowanie-debug.md) | toolchain, flashowanie, test toru SPP→BLE | 6 |
 | [docs/08-podlaczenie-stykowka.md](docs/08-podlaczenie-stykowka.md) | **schemat połączeń na płytce stykowej (v1, powerbank)** + [SVG](docs/podlaczenie-stykowka-v1.svg) | 1 |
+| [docs/09-instrukcja-app-usb.md](docs/09-instrukcja-app-usb.md) | **instrukcja dla sesji aplikacji: źródło pozycji po USB** (Android) | — |
 | [datasheety/README.md](datasheety/README.md) | linki do kart katalogowych | — |
 | [kicad/](kicad/) | **pełny schemat** + **PCB-carrier** (gniazda pod moduły + devkit ESP32, DRC 0 naruszeń, nietrasowana): [schemat PDF](kicad/gps_rtk_v1.pdf), [PCB 3D](kicad/gps_rtk_v1_pcb.png) | 1/7 |
 
