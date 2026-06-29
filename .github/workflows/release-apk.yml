@@ -1,0 +1,65 @@
+name: Build & Release APK
+
+# Buduje APK Fluttera (projekt w podkatalogu app/) i — przy tagu v* — publikuje
+# go jako GitHub Release. Aplikacja („Sprawdź aktualizacje") czyta ten release.
+# Wzorzec zaadaptowany z natywnego photo_prewiew (gradlew → flutter build apk).
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch: {}   # ręczne uruchomienie (build kontrolny, bez release)
+
+permissions:
+  contents: write          # potrzebne do utworzenia Release przy tagu v*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app   # projekt Fluttera siedzi w app/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'   # dopasowane do środowiska dev; lub channel: stable
+          cache: true
+
+      - name: Compute version (tag bez 'v')
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "name=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build debug APK
+        # --build-name z tagu → apka raportuje wersję = tag (do „Sprawdź aktualizacje").
+        run: flutter build apk --debug --build-name=${{ steps.ver.outputs.name }} --build-number=${{ github.run_number }}
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gps-rtk-apk
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+      - name: Attach APK to GitHub Release (only on v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/app/outputs/flutter-apk/app-debug.apk
+          generate_release_notes: true

@@ -1,0 +1,34 @@
+name: flutter_libserialport
+description: A simple wrapper around libserialport utilizing Flutter's
+  build system to build and deploy the C-library for the target platform.
+version: 0.4.0
+homepage: https://github.com/jpnurmi/flutter_libserialport
+repository: https://github.com/jpnurmi/flutter_libserialport
+issue_tracker: https://github.com/jpnurmi/flutter_libserialport/issues
+
+environment:
+  sdk: ">=2.17.0 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  libserialport: ^0.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+# Kopia lokalna (vendored) — USUNIĘTO platformę `android`: wtyczka 0.4.0 ma
+# androidowy plugin na starym API embeddingu v1 (`Registrar`), usuniętym we
+# Flutterze 3.x → nie kompiluje się. Na Androidzie i tak używamy `usb_serial`,
+# a tę wtyczkę tylko na desktopie (Windows/Linux/macOS). Reszta bez zmian.
+flutter:
+  plugin:
+    platforms:
+      linux:
+        pluginClass: FlutterLibserialportPlugin
+      macos:
+        pluginClass: FlutterLibserialportPlugin
+      windows:
+        pluginClass: FlutterLibserialportPlugin

@@ -1,0 +1,54 @@
+/// Typ rozwiązania pozycji — odpowiada polu "fix quality" ze zdania NMEA GGA.
+enum FixType {
+  none, // 0 - brak pozycji
+  gps, // 1 - pozycja autonomiczna (tak raportuje GPS telefonu)
+  dgps, // 2 - poprawki różnicowe kodowe
+  rtkFixed, // 4 - RTK Fixed (cm)
+  rtkFloat, // 5 - RTK Float (dm)
+}
+
+/// Ranga jakości fixa (większa = lepsza). Uwaga: kolejność wartości w enum nie
+/// odpowiada jakości (rtkFloat jest gorszy od rtkFixed), dlatego osobna funkcja.
+int fixRank(FixType f) => switch (f) {
+      FixType.none => 0,
+      FixType.gps => 1,
+      FixType.dgps => 2,
+      FixType.rtkFloat => 3,
+      FixType.rtkFixed => 4,
+    };
+
+/// Krótka etykieta typu fixa dla UI i eksportu.
+String fixLabel(FixType f) => switch (f) {
+      FixType.none => 'brak',
+      FixType.gps => 'GPS',
+      FixType.dgps => 'DGPS',
+      FixType.rtkFloat => 'RTK Float',
+      FixType.rtkFixed => 'RTK Fixed',
+    };
+
+/// Pozycja niezależna od źródła (GPS telefonu / odbiornik RTK po BLE).
+class RtkPosition {
+  final double latitude;
+  final double longitude;
+  final double? altitude;
+
+  /// Szacowany błąd poziomy w metrach (1 sigma).
+  final double accuracy;
+  final FixType fixType;
+  final int? satellites;
+
+  /// Kierunek ruchu (kurs nad ziemią) w stopniach 0–360, jeśli znany.
+  final double? heading;
+  final DateTime timestamp;
+
+  const RtkPosition({
+    required this.latitude,
+    required this.longitude,
+    required this.accuracy,
+    required this.fixType,
+    required this.timestamp,
+    this.altitude,
+    this.satellites,
+    this.heading,
+  });
+}
