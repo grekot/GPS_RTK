@@ -6,8 +6,9 @@ name: Build & Release APK
 
 on:
   push:
-    tags: [ "v*" ]
-  workflow_dispatch: {}   # ręczne uruchomienie (build kontrolny, bez release)
+    branches: [ main ]    # build kontrolny przy każdym pushu na main (bez release)
+    tags: [ "v*" ]        # tag v* → build + opublikowanie Release z APK
+  workflow_dispatch: {}   # ręczne uruchomienie z zakładki Actions
 
 permissions:
   contents: write          # potrzebne do utworzenia Release przy tagu v*
