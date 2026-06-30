@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Wyjątek: commitowany debug-keystore dla spójnego podpisu APK (CI + dev),
+# wymagany przez samoaktualizację. To standardowy klucz DEBUG (hasła
+# android/android), NIE produkcyjny — trzymanie go w repo jest bezpieczne.
+!app/debug.keystore

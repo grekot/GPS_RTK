@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'map/base_layers.dart';
@@ -1234,7 +1235,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (!mounted) return;
-    await showDialog<void>(
+    final wantUpdate = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(u.updateAvailable
@@ -1256,23 +1257,79 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Zamknij')),
           if (u.updateAvailable)
             FilledButton.icon(
-              onPressed: () async {
-                try {
-                  await launchUrl(Uri.parse(u.apkUrl ?? u.releaseUrl),
-                      mode: LaunchMode.externalApplication);
-                } catch (_) {/* brak przeglądarki — nic nie rób */}
-                if (context.mounted) Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(true),
               icon: const Icon(Icons.download),
-              label: Text(u.apkUrl != null ? 'Pobierz APK' : 'Otwórz release'),
+              label: Text(Platform.isAndroid && u.apkUrl != null
+                  ? 'Pobierz i zainstaluj'
+                  : (u.apkUrl != null ? 'Pobierz APK' : 'Otwórz release')),
             ),
         ],
       ),
     );
+    if (wantUpdate != true || !mounted) return;
+    // Android z assetem .apk → pobranie w apce + systemowy instalator (bez
+    // przeglądarki). Inne platformy / brak .apk → otwarcie linku.
+    if (Platform.isAndroid && u.apkUrl != null) {
+      await _downloadAndInstall(u.apkUrl!);
+    } else {
+      try {
+        await launchUrl(Uri.parse(u.apkUrl ?? u.releaseUrl),
+            mode: LaunchMode.externalApplication);
+      } catch (_) {/* brak przeglądarki — nic nie rób */}
+    }
+  }
+
+  /// Pobiera APK z [apkUrl] z paskiem postępu i uruchamia systemowy instalator.
+  /// Warunek powodzenia: nowy APK podpisany TYM SAMYM kluczem co zainstalowana
+  /// wersja (stały debug-keystore w repo) — inaczej Android odmówi instalacji
+  /// („package conflicts with an existing package"). Pierwszą wersję z nowym
+  /// kluczem trzeba zainstalować raz ręcznie.
+  Future<void> _downloadAndInstall(String apkUrl) async {
+    final progress = ValueNotifier<double>(0);
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Pobieranie aktualizacji…'),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progress,
+          builder: (context, v, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: v > 0 ? v : null),
+              const SizedBox(height: 12),
+              Text(v > 0 ? '${(v * 100).toStringAsFixed(0)}%' : 'Łączenie…'),
+            ],
+          ),
+        ),
+      ),
+    ));
+    try {
+      final path = await UpdateService()
+          .downloadApk(apkUrl, onProgress: (v) => progress.value = v);
+      if (!mounted) return;
+      Navigator.of(context).pop(); // zamknij dialog postępu
+      final res = await OpenFilex.open(
+        path,
+        type: 'application/vnd.android.package-archive',
+      );
+      if (res.type != ResultType.done && mounted) {
+        _showMessage(
+            'Nie udało się otworzyć instalatora (${res.message}). Zezwól '
+            'aplikacji na „Instalowanie nieznanych aplikacji" i spróbuj ponownie.');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // zamknij dialog postępu
+        _showMessage('Pobieranie nie powiodło się: ${_shortError(e)}');
+      }
+    } finally {
+      progress.dispose();
+    }
   }
 
   Future<void> _shareManual() async {

@@ -30,10 +30,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // Stały, commitowany debug-keystore — żeby APK budowane w CI i na maszynie
+        // dev miały TEN SAM podpis. Bez tego każdy runner CI generuje losowy
+        // ~/.android/debug.keystore → inny podpis co build → aktualizacja „w miejscu"
+        // pada z „App not installed — package conflicts with an existing package".
+        // To standardowy klucz debug Androida (hasła android/android), więc bezpieczny
+        // do commitu; NIE jest to klucz produkcyjny.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Podpis kluczem debug (stały, jak wyżej), by `flutter run --release` działał.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

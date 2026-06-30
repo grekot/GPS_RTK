@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ^3.11.5
@@ -51,7 +51,8 @@ dependencies:
   usb_serial: ^0.5.1 # USB-serial GPS (tylko Android; iOS/Windows bez natywnej części)
   flutter_libserialport: ^0.4.0 # port szeregowy / COM (desktop: Windows/Linux/macOS)
   package_info_plus: ^10.1.0 # wersja apki (do sprawdzania aktualizacji)
-  url_launcher: ^6.3.0 # otwarcie pobierania APK / strony release
+  url_launcher: ^6.3.0 # otwarcie strony release (fallback / desktop)
+  open_filex: ^4.7.0 # samoaktualizacja: uruchomienie pobranego APK w instalatorze (Android)
 
 # Lokalna kopia flutter_libserialport bez platformy Android (pub.dev 0.4.0 ma
 # androidowy plugin na usuniętym API v1 i nie buduje APK). Desktop bez zmian.
