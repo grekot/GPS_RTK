@@ -177,8 +177,7 @@ class _DesignScreenState extends State<DesignScreen> {
   // Ochrona mapy: pomijamy geometrię z przekłamaną współrzędną (np. projekt
   // zbudowany na uszkodzonym punkcie) — inaczej flutter_map rzuca asercją
   // LatLngBounds (north ≤ 90) przy liczeniu obrysu do cullingu / CameraFit.
-  bool _allValidLL(Iterable<LatLng> pts) =>
-      pts.every((p) => isValidLatLng(p.latitude, p.longitude));
+  bool _allValidLL(Iterable<LatLng> pts) => allValidLatLng(pts);
   Vec2 _loc(LatLng p) => _world.frame.toLocal(p);
 
   (Vec2, Vec2)? _parentSeg(int elem) {

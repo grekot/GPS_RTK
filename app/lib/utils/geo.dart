@@ -123,6 +123,14 @@ bool isValidLatLng(double lat, double lon) =>
     lat.abs() <= 90 &&
     lon.abs() <= 180;
 
+/// Czy lista współrzędnych NIE jest pusta i wszystkie punkty są poprawne.
+/// PUSTA lista → `false`: `Iterable.every` zwraca `true` dla pustej, więc
+/// `pts.every(isValidLatLng)` przepuszczał `[]` → `Polygon(points: [])`, którego
+/// `boundingBox` flutter_map liczy z zera podczas cullingu przy zoomie →
+/// `LatLng(NaN, NaN)` i wyjątek „LatLng is not finite". Wspólny strażnik warstw.
+bool allValidLatLng(Iterable<LatLng> pts) =>
+    pts.isNotEmpty && pts.every((p) => isValidLatLng(p.latitude, p.longitude));
+
 /// Spadek między dwoma punktami z wysokościami. `horizontal` = odległość
 /// pozioma [m], `deltaH` = różnica wysokości [m] (b−a; dodatni = b wyżej),
 /// `percent` = nachylenie [%], `permille` = [‰], `angleDeg` = kąt od poziomu

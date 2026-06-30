@@ -382,11 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Warstwy mapy z geometrią zapisanych projektów (fioletowo).
-  /// Wszystkie wierzchołki w poprawnym zakresie? (ochrona mapy przed asercją
-  /// flutter_map, gdy w danych trafi się przekłamana współrzędna).
-  bool _allValidLL(Iterable<LatLng> pts) =>
-      pts.every((p) => isValidLatLng(p.latitude, p.longitude));
+  /// Lista niepusta i wszystkie wierzchołki w poprawnym zakresie? (ochrona mapy
+  /// przed wyjątkiem flutter_map, gdy w danych trafi się przekłamana lub pusta
+  /// geometria). Alias na wspólny, przetestowany `allValidLatLng`.
+  bool _allValidLL(Iterable<LatLng> pts) => allValidLatLng(pts);
 
   List<Widget> _designMapLayers() {
     if (_designs.isEmpty) return const [];
@@ -1838,6 +1837,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: (_parcels.isNotEmpty &&
+                      _parcels.first.points.isNotEmpty &&
                       isValidLatLng(_parcels.first.points.first.latitude,
                           _parcels.first.points.first.longitude))
                   ? _parcels.first.points.first
@@ -1899,6 +1899,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 MarkerLayer(
                   markers: [
                     for (final u in _utilityPoints)
+                      if (isValidLatLng(u.latitude, u.longitude))
                       Marker(
                         point: u.latLng,
                         width: 16,

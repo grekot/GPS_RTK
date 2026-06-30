@@ -162,6 +162,31 @@ void main() {
     expect(isValidLatLng(double.infinity, 20), isFalse);
   });
 
+  group('allValidLatLng — strażnik warstw mapy', () {
+    test('PUSTA lista → false (inaczej Polygon([]) → LatLng(NaN) przy zoomie)', () {
+      // Sedno buga: Iterable.every na pustej liście zwraca true.
+      expect(<LatLng>[].every((p) => isValidLatLng(p.latitude, p.longitude)),
+          isTrue); // dokumentuje pułapkę, której unikamy
+      expect(allValidLatLng(const <LatLng>[]), isFalse);
+    });
+
+    test('lista samych poprawnych → true', () {
+      expect(allValidLatLng(gnojnikRing), isTrue);
+      expect(allValidLatLng(const [LatLng(49.9, 20.6)]), isTrue);
+    });
+
+    test('jedna przekłamana współrzędna → false', () {
+      expect(
+        allValidLatLng(const [LatLng(49.9, 20.6), LatLng(1054.6, 20)]),
+        isFalse,
+      );
+      expect(
+        allValidLatLng([const LatLng(49.9, 20.6), LatLng(double.nan, 20)]),
+        isFalse,
+      );
+    });
+  });
+
   group('polygonAreaPerimeter', () {
     test('kwadrat 10×10 m -> 100 m² i 40 m obwodu', () {
       // Wierzchołki budowane przez destinationLatLng (N/E w metrach), więc
