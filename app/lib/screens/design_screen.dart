@@ -1089,6 +1089,7 @@ class _DesignScreenState extends State<DesignScreen> {
                           builder: (context, layer, _) =>
                               buildBaseTileLayer(layer),
                         ),
+                        const OrtoHighResOverlay(),
                         const UtilitiesOverlay(),
                         const BuildingsOverlay(),
                         PolygonLayer(

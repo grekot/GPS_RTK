@@ -93,6 +93,44 @@ class BuildingsOverlay extends StatelessWidget {
   }
 }
 
+/// Nakładka NAJNOWSZEGO ortofoto GUGiK (HighResolution, ≥10 cm) — przezroczysty
+/// PNG NA WIERZCHU StandardResolution. Tam gdzie jest nalot wysokiej rozdzielczości
+/// (zwykle zabudowa — np. nowy dom) pokazuje świeże zdjęcie; gdzie go brak — piksele
+/// są przezroczyste, więc widać podkład standardowy pod spodem. Tak samo składa je
+/// Geoportal. HighResolution NIE ogłasza EPSG:3857 w GetCapabilities, ale serwer
+/// reprojektuje na żądanie (zweryfikowane GetMap-em) — dzięki temu działa na mapie
+/// w web-mercator bez zmiany układu.
+TileLayer buildOrtoHighResOverlay() {
+  return TileLayer(
+    wmsOptions: WMSTileLayerOptions(
+      baseUrl: 'https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/'
+          'HighResolution?',
+      layers: const ['Raster'],
+      format: 'image/png',
+      version: '1.1.1',
+      transparent: true,
+    ),
+    userAgentPackageName: _userAgent,
+    maxNativeZoom: 21,
+  );
+}
+
+/// Warstwa renderująca nakładkę high-res ortofoto — tylko gdy aktywnym podkładem
+/// jest „Ortofoto GUGiK" (dla OSM/Esri nie ma sensu).
+class OrtoHighResOverlay extends StatelessWidget {
+  const OrtoHighResOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<MapBaseLayer>(
+      valueListenable: activeBaseLayer,
+      builder: (context, layer, _) => layer == MapBaseLayer.ortoGugik
+          ? buildOrtoHighResOverlay()
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
 /// Buduje warstwę kafelków dla wybranego podkładu.
 TileLayer buildBaseTileLayer(MapBaseLayer layer) {
   switch (layer) {

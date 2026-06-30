@@ -162,6 +162,7 @@ class _AreaScreenState extends State<AreaScreen> {
                 valueListenable: activeBaseLayer,
                 builder: (context, layer, _) => buildBaseTileLayer(layer),
               ),
+              const OrtoHighResOverlay(),
               const UtilitiesOverlay(),
               const BuildingsOverlay(),
               if (_pts.length >= 3)

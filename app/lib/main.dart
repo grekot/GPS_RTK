@@ -1914,6 +1914,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 valueListenable: activeBaseLayer,
                 builder: (context, layer, _) => buildBaseTileLayer(layer),
               ),
+              // Najnowsze ortofoto wysokiej rozdzielczości NA WIERZCHU podkładu
+              // GUGiK (przezroczyste tam, gdzie brak nalotu 10 cm).
+              const OrtoHighResOverlay(),
               const UtilitiesOverlay(),
               const BuildingsOverlay(),
               if (_buildings.isNotEmpty)

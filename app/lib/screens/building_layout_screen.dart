@@ -196,6 +196,7 @@ class _BuildingLayoutScreenState extends State<BuildingLayoutScreen> {
                 valueListenable: activeBaseLayer,
                 builder: (context, layer, _) => buildBaseTileLayer(layer),
               ),
+              const OrtoHighResOverlay(),
               if (corners != null) ...[
                 PolygonLayer(polygons: [
                   Polygon(

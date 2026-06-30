@@ -456,6 +456,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                 valueListenable: activeBaseLayer,
                 builder: (context, layer, _) => buildBaseTileLayer(layer),
               ),
+              const OrtoHighResOverlay(),
               const UtilitiesOverlay(),
               const BuildingsOverlay(),
               PolygonLayer(
