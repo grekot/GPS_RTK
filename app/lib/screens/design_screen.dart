@@ -363,13 +363,21 @@ class _DesignScreenState extends State<DesignScreen> {
   }
 
   Future<void> _deleteSelected() async {
-    final i = _selected;
-    if (i == null) return;
+    if (_selected != null) await _deleteElement(_selected!);
+  }
+
+  /// Usuwa element o indeksie [i] (z panelu zaznaczenia lub z listy elementów).
+  /// Zależne elementy (ich `ref` LUB `ref2` wskazuje na [i]) zostają „zamrożone"
+  /// w obecnym położeniu; pozostałe odniesienia do elementów o wyższym indeksie
+  /// (w tym `ref2` przecięć i linie robocze) są przesuwane o jeden w dół.
+  Future<void> _deleteElement(int i) async {
+    if (i < 0 || i >= _design.elements.length) return;
+    bool dependsOnI(DesignElement e) =>
+        (e.ref.kind == 'element' && e.ref.element == i) ||
+        (e.ref2 != null && e.ref2!.kind == 'element' && e.ref2!.element == i);
     final dependents = <int>[
       for (var j = 0; j < _design.elements.length; j++)
-        if (_design.elements[j].ref.kind == 'element' &&
-            _design.elements[j].ref.element == i)
-          j,
+        if (j != i && dependsOnI(_design.elements[j])) j,
     ];
     if (dependents.isNotEmpty) {
       final ok = await showDialog<bool>(
@@ -393,24 +401,101 @@ class _DesignScreenState extends State<DesignScreen> {
         ),
       );
       if (ok != true) return;
-      // Zamroź zależne na obecnej krawędzi usuwanego elementu.
+      // Zamroź zależne (ref i/lub ref2) na obecnej krawędzi usuwanego elementu.
       for (final j in dependents) {
         final e = _design.elements[j];
-        e.ref = _frozenRefFor(i, e.ref.edge);
+        if (e.ref.kind == 'element' && e.ref.element == i) {
+          e.ref = _frozenRefFor(i, e.ref.edge);
+        }
+        if (e.ref2 != null &&
+            e.ref2!.kind == 'element' &&
+            e.ref2!.element == i) {
+          e.ref2 = _frozenRefFor(i, e.ref2!.edge);
+        }
       }
     }
     setState(() {
       _design.elements.removeAt(i);
+      GeomRef shiftDown(GeomRef r) => (r.kind == 'element' && r.element > i)
+          ? GeomRef(kind: 'element', element: r.element - 1, edge: r.edge)
+          : r;
       for (final e in _design.elements) {
-        if (e.ref.kind == 'element' && e.ref.element > i) {
-          e.ref =
-              GeomRef(kind: 'element', element: e.ref.element - 1, edge: e.ref.edge);
-        }
+        e.ref = shiftDown(e.ref);
+        if (e.ref2 != null) e.ref2 = shiftDown(e.ref2!);
       }
-      _selected = null;
+      for (var k = 0; k < _design.workingLines.length; k++) {
+        _design.workingLines[k] = shiftDown(_design.workingLines[k]);
+      }
+      if (_selected == i) {
+        _selected = null;
+      } else if (_selected != null && _selected! > i) {
+        _selected = _selected! - 1;
+      }
       _recompute();
     });
     _bindControllers();
+  }
+
+  /// Lista elementów projektu z możliwością wyboru (dotknięcie) i usunięcia.
+  Future<void> _showElementsList() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final els = _design.elements;
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.list),
+                  title: Text('Elementy projektu (${els.length})'),
+                ),
+                const Divider(height: 1),
+                if (els.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                        'Brak elementów. Użyj „Dodaj", aby utworzyć pierwszy.'),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: els.length,
+                      itemBuilder: (ctx, i) {
+                        final e = els[i];
+                        return ListTile(
+                          leading: Icon(e.tool.icon),
+                          title: Text('${i + 1}. ${e.tool.label}'),
+                          subtitle: Text(e.tool.isPoint
+                              ? 'punkt'
+                              : 'względem ${_refLabel(e.ref)}'),
+                          selected: _selected == i,
+                          onTap: () {
+                            _selectElement(i);
+                            Navigator.pop(ctx);
+                          },
+                          trailing: IconButton(
+                            tooltip: 'Usuń element',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              await _deleteElement(i);
+                              setSheet(() {});
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _bindControllers() {
@@ -634,6 +719,25 @@ class _DesignScreenState extends State<DesignScreen> {
 
   // ——— Mapa: wskazanie odniesienia / wybór elementu ———
 
+  /// GeomRef najbliższej wskazywalnej linii do [local]: krawędzie odniesienia
+  /// ORAZ (gdy linie robocze są widoczne) linie robocze — dzięki temu np. punkt
+  /// przecięcia można postawić także na przecięciu z linią roboczą. Null = brak.
+  GeomRef? _nearestRefLine(Vec2 local) {
+    final cands = <(Vec2, Vec2, GeomRef)>[
+      for (final s in _world.refSegments(_design, _computed, hidden: _hidden))
+        (s.a, s.b, s.ref),
+    ];
+    if (_showWorking) {
+      for (final ref in _design.workingLines) {
+        final ws = _world.workingLine(ref, _computed, {_design.id});
+        if (ws != null) cands.add((ws.$1, ws.$2, ref));
+      }
+    }
+    if (cands.isEmpty) return null;
+    final i = nearestSegmentIndex([for (final c in cands) (c.$1, c.$2)], local);
+    return cands[i].$3;
+  }
+
   void _onMapTap(LatLng point) {
     final local = _loc(point);
     if (_pendingWorking) {
@@ -678,25 +782,24 @@ class _DesignScreenState extends State<DesignScreen> {
       return;
     }
     if (_pendingTool != null) {
-      final segs = _world.refSegments(_design, _computed, hidden: _hidden);
-      if (segs.isEmpty) {
+      final ref = _nearestRefLine(local);
+      if (ref == null) {
         _snack('Brak widocznych linii/krawędzi.');
         return;
       }
-      final i = nearestSegmentIndex([for (final s in segs) (s.a, s.b)], local);
       if (_pendingTool == ToolType.punktPrzeciecie) {
         if (_intersectFirst == null) {
-          setState(() => _intersectFirst = segs[i].ref);
+          setState(() => _intersectFirst = ref);
           _snack('Wskaż drugą linię.');
         } else {
           _createElementWith(DesignElement(
             tool: ToolType.punktPrzeciecie,
             ref: _intersectFirst!,
-            ref2: segs[i].ref,
+            ref2: ref,
           ));
         }
       } else {
-        _createElement(_pendingTool!, segs[i].ref);
+        _createElement(_pendingTool!, ref);
       }
       return;
     }
@@ -1212,8 +1315,8 @@ class _DesignScreenState extends State<DesignScreen> {
                           ToolType.punktReczny =>
                             'Dotknij miejsca, by wstawić punkt',
                           ToolType.punktPrzeciecie => _intersectFirst == null
-                              ? 'Wskaż pierwszą linię'
-                              : 'Wskaż drugą linię',
+                              ? 'Wskaż pierwszą linię (też roboczą)'
+                              : 'Wskaż drugą linię (też roboczą)',
                           _ => 'Wskaż krawędź odniesienia dla: '
                               '${_pendingTool!.label}',
                         },
@@ -1424,6 +1527,12 @@ class _DesignScreenState extends State<DesignScreen> {
                       '${_design.elements.length} elem. · $pointCount pkt',
                       style: theme.textTheme.bodySmall,
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Lista elementów',
+                    onPressed:
+                        _design.elements.isEmpty ? null : _showElementsList,
+                    icon: const Icon(Icons.list),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: _pickToolToAdd,
