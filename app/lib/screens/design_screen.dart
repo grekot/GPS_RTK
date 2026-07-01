@@ -129,6 +129,9 @@ class _DesignScreenState extends State<DesignScreen> {
   bool _pendingWorking = false; // czekamy na wskazanie krawędzi pod linię roboczą
   GeomRef? _intersectFirst; // pierwsza wskazana linia (punkt przecięcia)
   Vec2? _lineFirst; // pierwszy wskazany punkt (linia między punktami)
+  bool _pendingMeasure = false; // tryb linijki (pomiar odległości)
+  Vec2? _measureFirst; // pierwszy punkt pomiaru
+  ({Vec2 a, Vec2 b, double dist, double az})? _measure; // gotowy pomiar (rysowany)
   final Set<String> _hidden = {}; // klucze 'kind:id' ukrytych geometrii
   bool _snap = true; // przyciąganie do punktów (wł/wył)
   bool _showWorking = true; // widoczność linii roboczych
@@ -265,6 +268,13 @@ class _DesignScreenState extends State<DesignScreen> {
                   '— nie jest tyczona'),
               onTap: () => Navigator.pop(ctx, 'working'),
             ),
+            ListTile(
+              leading: const Icon(Icons.straighten),
+              title: const Text('Pomiar odległości (linijka)'),
+              subtitle: const Text('wskaż dwa punkty — pokaże odległość i azymut '
+                  '(nic nie rysuje na stałe)'),
+              onTap: () => Navigator.pop(ctx, 'measure'),
+            ),
           ],
         ),
       ),
@@ -274,6 +284,22 @@ class _DesignScreenState extends State<DesignScreen> {
       setState(() {
         _pendingWorking = true;
         _pendingTool = null;
+        _intersectFirst = null;
+        _lineFirst = null;
+        _pendingMeasure = false;
+        _measureFirst = null;
+        _selected = null;
+      });
+      _bindControllers();
+      return;
+    }
+    if (picked == 'measure') {
+      setState(() {
+        _pendingMeasure = true;
+        _measureFirst = null;
+        _measure = null;
+        _pendingTool = null;
+        _pendingWorking = false;
         _intersectFirst = null;
         _lineFirst = null;
         _selected = null;
@@ -291,6 +317,8 @@ class _DesignScreenState extends State<DesignScreen> {
       _pendingWorking = false;
       _intersectFirst = null;
       _lineFirst = null;
+      _pendingMeasure = false;
+      _measureFirst = null;
       _selected = null;
     });
     _bindControllers();
@@ -775,6 +803,27 @@ class _DesignScreenState extends State<DesignScreen> {
 
   void _onMapTap(LatLng point) {
     final local = _loc(point);
+    if (_pendingMeasure) {
+      final p = _snapPoint(local);
+      if (_measureFirst == null) {
+        setState(() => _measureFirst = p);
+        _snack('Wskaż drugi punkt.');
+      } else {
+        final a = _measureFirst!, b = p;
+        final aLL = _ll(a), bLL = _ll(b);
+        setState(() {
+          _measure = (
+            a: a,
+            b: b,
+            dist: distanceMeters(aLL, bLL),
+            az: bearingDegrees(aLL, bLL),
+          );
+          _measureFirst = null;
+          _pendingMeasure = false;
+        });
+      }
+      return;
+    }
     if (_pendingWorking) {
       final segs = _world.refSegments(_design, _computed, hidden: _hidden);
       if (segs.isEmpty) {
@@ -1307,6 +1356,14 @@ class _DesignScreenState extends State<DesignScreen> {
                               ),
                           ],
                         ),
+                        if (_measure != null)
+                          PolylineLayer(polylines: [
+                            Polyline(
+                              points: [_ll(_measure!.a), _ll(_measure!.b)],
+                              color: Colors.cyan,
+                              strokeWidth: 3,
+                            ),
+                          ]),
                         if (dimHeads.isNotEmpty)
                           PolygonLayer(
                             polygons: [
@@ -1326,6 +1383,19 @@ class _DesignScreenState extends State<DesignScreen> {
                             for (final pt in handleLL) _handleDot(pt),
                             if (_lineFirst != null)
                               _dot(_ll(_lineFirst!), Colors.green, big: true),
+                            if (_measureFirst != null)
+                              _dot(_ll(_measureFirst!), Colors.green, big: true),
+                            if (_measure != null) ...[
+                              _dot(_ll(_measure!.a), Colors.cyan, big: true),
+                              _dot(_ll(_measure!.b), Colors.cyan, big: true),
+                              Marker(
+                                point: _ll((_measure!.a + _measure!.b) * 0.5),
+                                width: 130,
+                                height: 24,
+                                child:
+                                    _measureChip(formatDistance(_measure!.dist)),
+                              ),
+                            ],
                             if (_snapHighlight != null)
                               _snapRing(_ll(_snapHighlight!)),
                             for (final d in dimLabels)
@@ -1372,6 +1442,56 @@ class _DesignScreenState extends State<DesignScreen> {
                           _ => 'Wskaż krawędź odniesienia dla: '
                               '${_pendingTool!.label}',
                         },
+                      ),
+                    ),
+                  if (_pendingMeasure)
+                    Positioned(
+                      top: 8,
+                      left: 12,
+                      right: 64,
+                      child: _Banner(
+                        icon: Icons.straighten,
+                        text: _measureFirst == null
+                            ? 'Pomiar: wskaż pierwszy punkt'
+                            : 'Pomiar: wskaż drugi punkt',
+                      ),
+                    ),
+                  if (_measure != null && !_pendingMeasure)
+                    Positioned(
+                      top: 8,
+                      left: 12,
+                      right: 12,
+                      child: Material(
+                        elevation: 3,
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.cyan.shade700,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 2, 4, 2),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.straighten,
+                                  color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Odległość: ${formatDistance(_measure!.dist)}'
+                                  ' · azymut ${_measure!.az.toStringAsFixed(0)}° '
+                                  '${cardinal(_measure!.az)}',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Wyczyść pomiar',
+                                onPressed: () =>
+                                    setState(() => _measure = null),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white, size: 18),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   if (_drag != null && sel != null)
@@ -1477,6 +1597,21 @@ class _DesignScreenState extends State<DesignScreen> {
         ),
       );
 
+  Widget _measureChip(String text) => Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.cyan.shade800,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(text,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+        ),
+      );
+
   Widget _controls(DesignElement? sel, int pointCount) {
     final theme = Theme.of(context);
     return Material(
@@ -1493,17 +1628,21 @@ class _DesignScreenState extends State<DesignScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-            if (_pendingTool != null || _pendingWorking)
+            if (_pendingTool != null || _pendingWorking || _pendingMeasure)
               Row(
                 children: [
                   Expanded(
-                    child: Text(_pendingWorking
-                        ? 'Dotknij krawędzi, którą przedłużyć jako linię roboczą.'
-                        : _pendingTool == ToolType.punktReczny
-                            ? 'Dotknij miejsca na mapie, by wstawić pojedynczy '
-                                'punkt.'
-                            : 'Dotknij krawędzi (działka, budynek, inny projekt '
-                                'lub element), względem której utworzyć.'),
+                    child: Text(_pendingMeasure
+                        ? 'Pomiar: dotknij dwóch punktów, by zmierzyć odległość.'
+                        : _pendingWorking
+                            ? 'Dotknij krawędzi, którą przedłużyć jako linię '
+                                'roboczą.'
+                            : _pendingTool == ToolType.punktReczny
+                                ? 'Dotknij miejsca na mapie, by wstawić '
+                                    'pojedynczy punkt.'
+                                : 'Dotknij krawędzi (działka, budynek, inny '
+                                    'projekt lub element), względem której '
+                                    'utworzyć.'),
                   ),
                   TextButton(
                     onPressed: () => setState(() {
@@ -1511,6 +1650,8 @@ class _DesignScreenState extends State<DesignScreen> {
                       _pendingWorking = false;
                       _intersectFirst = null;
                       _lineFirst = null;
+                      _pendingMeasure = false;
+                      _measureFirst = null;
                     }),
                     child: const Text('Anuluj'),
                   ),

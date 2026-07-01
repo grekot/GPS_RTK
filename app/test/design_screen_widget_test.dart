@@ -66,4 +66,38 @@ void main() {
     expect(tester.takeException(), isNull); // panel nie rzuca ArgumentError
     expect(find.textContaining('Linia między punktami'), findsWidgets);
   });
+
+  // Linijka: wejście w tryb pomiaru + dwa tapnięcia na mapie → baner z wynikiem.
+  testWidgets('linijka: pomiar odległości między dwoma punktami', (tester) async {
+    final sq = _square();
+    final d = Design(id: 'D', name: 'Test', createdAt: DateTime.utc(2026));
+
+    await tester.pumpWidget(_screen(d, sq));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Wejdź w tryb pomiaru przez „Dodaj".
+    await tester.tap(find.text('Dodaj'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('wybierz typ'), findsOneWidget); // picker otwarty
+    final measureItem = find.text('Pomiar odległości (linijka)');
+    await tester.scrollUntilVisible(measureItem, 120,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(measureItem);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('wskaż pierwszy punkt'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Dwa tapnięcia na mapie (górna część ekranu) → pomiar.
+    await tester.tapAt(const Offset(200, 250));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(360, 360));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('Odległość:'), findsOneWidget);
+
+    // Osusz 4-sekundowy timer SnackBara („wskaż drugi punkt"), inaczej teardown
+    // zgłasza „Timer still pending".
+    await tester.pump(const Duration(seconds: 5));
+  });
 }
