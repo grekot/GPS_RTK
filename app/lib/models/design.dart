@@ -22,6 +22,7 @@ enum ToolType {
   punktReczny, // pojedynczy punkt wskazany na mapie (stałe współrzędne)
   punktGps, // punkt z pomiaru terenowego (stałe współrzędne)
   punktPrzeciecie, // punkt na przecięciu dwóch linii (ref + ref2)
+  liniaPunkty, // linia między dwoma wybranymi punktami (ref = frozen [a,b])
 }
 
 /// Odniesienie elementu do krawędzi pewnej geometrii w obszarze:
@@ -394,6 +395,10 @@ class DesignWorld {
                     e.radius,
         ];
         return ComputedElement(pts, pts, false);
+      case ToolType.liniaPunkty:
+        // Odcinek między dwoma zamrożonymi punktami (ref = frozen [a,b]),
+        // bez offset/along — po prostu łączy wskazane punkty.
+        return ComputedElement([a, b], [a, b], false);
       case ToolType.obrysOdsuniety:
       case ToolType.punktReczny:
       case ToolType.punktGps:

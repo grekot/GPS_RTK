@@ -231,6 +231,30 @@ void main() {
       expect((c[0].path[0] - w.parcelLocal['P1']![2]).length, closeTo(0, 1e-6));
     });
 
+    test('linia między punktami = odcinek łączący dwa wskazane punkty', () {
+      final sq = _square();
+      final d = Design(id: 'D', name: 'd', createdAt: DateTime.utc(2026));
+      // Łączymy wierzchołek 0 i wierzchołek 2 działki (przekątna kwadratu).
+      final p0 = sq.points[0], p2 = sq.points[2];
+      d.elements.add(DesignElement(
+        tool: ToolType.liniaPunkty,
+        ref: GeomRef(kind: 'frozen', frozen: [
+          p0.latitude,
+          p0.longitude,
+          p2.latitude,
+          p2.longitude,
+        ]),
+      ));
+      final w = DesignWorld(parcels: [sq], buildings: const [], designs: [d]);
+      final c = w.computeDesign(d);
+      expect(c[0].closed, isFalse);
+      expect(c[0].path, hasLength(2));
+      expect(c[0].stake, hasLength(2)); // oba końce są tyczone
+      final ring = w.parcelLocal['P1']!;
+      expect((c[0].path[0] - ring[0]).length, closeTo(0, 1e-6));
+      expect((c[0].path[1] - ring[2]).length, closeTo(0, 1e-6));
+    });
+
     test('linia robocza przedłuża krawędź o zapas w obie strony', () {
       final sq = _square();
       final d = Design(

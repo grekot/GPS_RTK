@@ -31,6 +31,7 @@ extension _ToolX on ToolType {
         ToolType.punktReczny => 'Pojedynczy punkt (wskaż na mapie)',
         ToolType.punktGps => 'Punkt z pomiaru GPS',
         ToolType.punktPrzeciecie => 'Punkt przecięcia linii',
+        ToolType.liniaPunkty => 'Linia między punktami',
       };
   IconData get icon => switch (this) {
         ToolType.rownolegla => Icons.straighten,
@@ -45,6 +46,7 @@ extension _ToolX on ToolType {
         ToolType.punktReczny => Icons.add_location_alt,
         ToolType.punktGps => Icons.my_location,
         ToolType.punktPrzeciecie => Icons.close,
+        ToolType.liniaPunkty => Icons.linear_scale,
       };
   bool get isPoint =>
       this == ToolType.punktReczny ||
@@ -126,6 +128,7 @@ class _DesignScreenState extends State<DesignScreen> {
   ToolType? _pendingTool;
   bool _pendingWorking = false; // czekamy na wskazanie krawędzi pod linię roboczą
   GeomRef? _intersectFirst; // pierwsza wskazana linia (punkt przecięcia)
+  Vec2? _lineFirst; // pierwszy wskazany punkt (linia między punktami)
   final Set<String> _hidden = {}; // klucze 'kind:id' ukrytych geometrii
   bool _snap = true; // przyciąganie do punktów (wł/wył)
   bool _showWorking = true; // widoczność linii roboczych
@@ -272,6 +275,7 @@ class _DesignScreenState extends State<DesignScreen> {
         _pendingWorking = true;
         _pendingTool = null;
         _intersectFirst = null;
+        _lineFirst = null;
         _selected = null;
       });
       _bindControllers();
@@ -286,6 +290,7 @@ class _DesignScreenState extends State<DesignScreen> {
       _pendingTool = tool;
       _pendingWorking = false;
       _intersectFirst = null;
+      _lineFirst = null;
       _selected = null;
     });
     _bindControllers();
@@ -296,6 +301,7 @@ class _DesignScreenState extends State<DesignScreen> {
       _design.elements.add(e);
       _pendingTool = null;
       _intersectFirst = null;
+      _lineFirst = null;
       _selected = _design.elements.length - 1;
       _recompute();
     });
@@ -738,6 +744,28 @@ class _DesignScreenState extends State<DesignScreen> {
     return cands[i].$3;
   }
 
+  /// Przyciąga [local] do najbliższego wierzchołka/punktu (gdy `_snap` wł.):
+  /// wierzchołki działek/budynków, punkty innych projektów, własne węzły/punkty,
+  /// oraz — gdy widoczne — rzut na linie robocze. Zwraca [local] bez zmian, gdy
+  /// przyciąganie wyłączone albo nic nie leży dość blisko.
+  Vec2 _snapPoint(Vec2 local) {
+    if (!_snap) return local;
+    final candidates = <Vec2>[
+      for (final ring in _world.parcelLocal.values) ...ring,
+      for (final ring in _world.buildingLocal.values) ...ring,
+      for (final g in _others.values)
+        for (final c in g) ...c.path,
+      for (final c in _computed) ...[...c.path, ...c.stake],
+    ];
+    if (_showWorking) {
+      for (final ref in _design.workingLines) {
+        final ws = _world.workingLine(ref, _computed, {_design.id});
+        if (ws != null) candidates.add(closestPointOnLine(local, ws.$1, ws.$2));
+      }
+    }
+    return snapToNearest(local, candidates, 24 * _metersPerPx());
+  }
+
   void _onMapTap(LatLng point) {
     final local = _loc(point);
     if (_pendingWorking) {
@@ -755,30 +783,31 @@ class _DesignScreenState extends State<DesignScreen> {
       return;
     }
     if (_pendingTool == ToolType.punktReczny) {
-      var pos = local;
-      if (_snap) {
-        final candidates = <Vec2>[
-          for (final ring in _world.parcelLocal.values) ...ring,
-          for (final ring in _world.buildingLocal.values) ...ring,
-          for (final g in _others.values)
-            for (final c in g) ...c.path,
-          for (final c in _computed) ...[...c.path, ...c.stake],
-        ];
-        if (_showWorking) {
-          for (final ref in _design.workingLines) {
-            final ws = _world.workingLine(ref, _computed, {_design.id});
-            if (ws != null) {
-              candidates.add(closestPointOnLine(local, ws.$1, ws.$2));
-            }
-          }
-        }
-        pos = snapToNearest(local, candidates, 24 * _metersPerPx());
-      }
-      final ll = _ll(pos);
+      final ll = _ll(_snapPoint(local));
       _createElementWith(DesignElement(
         tool: ToolType.punktReczny,
         ref: GeomRef(kind: 'point', frozen: [ll.latitude, ll.longitude]),
       ));
+      return;
+    }
+    if (_pendingTool == ToolType.liniaPunkty) {
+      final p = _snapPoint(local);
+      if (_lineFirst == null) {
+        setState(() => _lineFirst = p);
+        _snack('Wskaż drugi punkt.');
+      } else {
+        final a = _ll(_lineFirst!);
+        final b = _ll(p);
+        _createElementWith(DesignElement(
+          tool: ToolType.liniaPunkty,
+          ref: GeomRef(kind: 'frozen', frozen: [
+            a.latitude,
+            a.longitude,
+            b.latitude,
+            b.longitude,
+          ]),
+        ));
+      }
       return;
     }
     if (_pendingTool != null) {
@@ -1279,6 +1308,8 @@ class _DesignScreenState extends State<DesignScreen> {
                             for (final pt in selStakeLL)
                               _dot(pt, Colors.green, big: true),
                             for (final pt in handleLL) _handleDot(pt),
+                            if (_lineFirst != null)
+                              _dot(_ll(_lineFirst!), Colors.green, big: true),
                             if (_snapHighlight != null)
                               _snapRing(_ll(_snapHighlight!)),
                             for (final d in dimLabels)
@@ -1317,6 +1348,9 @@ class _DesignScreenState extends State<DesignScreen> {
                           ToolType.punktPrzeciecie => _intersectFirst == null
                               ? 'Wskaż pierwszą linię (też roboczą)'
                               : 'Wskaż drugą linię (też roboczą)',
+                          ToolType.liniaPunkty => _lineFirst == null
+                              ? 'Wskaż pierwszy punkt'
+                              : 'Wskaż drugi punkt',
                           _ => 'Wskaż krawędź odniesienia dla: '
                               '${_pendingTool!.label}',
                         },
@@ -1457,6 +1491,8 @@ class _DesignScreenState extends State<DesignScreen> {
                     onPressed: () => setState(() {
                       _pendingTool = null;
                       _pendingWorking = false;
+                      _intersectFirst = null;
+                      _lineFirst = null;
                     }),
                     child: const Text('Anuluj'),
                   ),
@@ -1725,7 +1761,8 @@ class _DesignScreenState extends State<DesignScreen> {
       case ToolType.punktReczny:
       case ToolType.punktGps:
       case ToolType.punktPrzeciecie:
-        return const []; // punkty nie mają parametrów liczbowych
+      case ToolType.liniaPunkty:
+        return const []; // punkty / linia punkt-punkt: bez parametrów liczbowych
     }
   }
 }
