@@ -75,14 +75,8 @@ void main() {
     await tester.pumpWidget(_screen(d, sq));
     await tester.pump(const Duration(milliseconds: 50));
 
-    // Wejdź w tryb pomiaru przez „Dodaj".
-    await tester.tap(find.text('Dodaj'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('wybierz typ'), findsOneWidget); // picker otwarty
-    final measureItem = find.text('Pomiar odległości (linijka)');
-    await tester.scrollUntilVisible(measureItem, 120,
-        scrollable: find.byType(Scrollable).last);
-    await tester.tap(measureItem);
+    // Wejdź w tryb pomiaru przez ikonę „Pomiar" na górnej belce.
+    await tester.tap(find.byTooltip('Pomiar odległości (linijka)'));
     await tester.pumpAndSettle();
     expect(find.textContaining('wskaż pierwszy punkt'), findsOneWidget);
     expect(tester.takeException(), isNull);

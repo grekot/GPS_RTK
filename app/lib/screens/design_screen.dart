@@ -241,6 +241,21 @@ class _DesignScreenState extends State<DesignScreen> {
 
   // ——— Dodawanie / wybór / usuwanie ———
 
+  /// Wchodzi w tryb linijki (pomiar odległości) — z ikony „Pomiar" na belce.
+  void _startMeasure() {
+    setState(() {
+      _pendingMeasure = true;
+      _measureFirst = null;
+      _measure = null;
+      _pendingTool = null;
+      _pendingWorking = false;
+      _intersectFirst = null;
+      _lineFirst = null;
+      _selected = null;
+    });
+    _bindControllers();
+  }
+
   Future<void> _pickToolToAdd() async {
     final picked = await showModalBottomSheet<Object>(
       context: context,
@@ -268,13 +283,6 @@ class _DesignScreenState extends State<DesignScreen> {
                   '— nie jest tyczona'),
               onTap: () => Navigator.pop(ctx, 'working'),
             ),
-            ListTile(
-              leading: const Icon(Icons.straighten),
-              title: const Text('Pomiar odległości (linijka)'),
-              subtitle: const Text('wskaż dwa punkty — pokaże odległość i azymut '
-                  '(nic nie rysuje na stałe)'),
-              onTap: () => Navigator.pop(ctx, 'measure'),
-            ),
           ],
         ),
       ),
@@ -288,20 +296,6 @@ class _DesignScreenState extends State<DesignScreen> {
         _lineFirst = null;
         _pendingMeasure = false;
         _measureFirst = null;
-        _selected = null;
-      });
-      _bindControllers();
-      return;
-    }
-    if (picked == 'measure') {
-      setState(() {
-        _pendingMeasure = true;
-        _measureFirst = null;
-        _measure = null;
-        _pendingTool = null;
-        _pendingWorking = false;
-        _intersectFirst = null;
-        _lineFirst = null;
         _selected = null;
       });
       _bindControllers();
@@ -1203,18 +1197,7 @@ class _DesignScreenState extends State<DesignScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: GestureDetector(
-            onTap: _rename,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                    child: Text(_design.name, overflow: TextOverflow.ellipsis)),
-                const SizedBox(width: 6),
-                const Icon(Icons.edit, size: 16),
-              ],
-            ),
-          ),
+          title: Text(_design.name, overflow: TextOverflow.ellipsis),
           actions: [
             IconButton(
               tooltip: _snap
@@ -1225,28 +1208,70 @@ class _DesignScreenState extends State<DesignScreen> {
               icon: Icon(_snap ? Icons.adjust : Icons.location_disabled),
             ),
             IconButton(
-              tooltip: _showWorking
-                  ? 'Linie robocze: WŁ'
-                  : 'Linie robocze: WYŁ',
-              isSelected: _showWorking,
-              onPressed: () => setState(() => _showWorking = !_showWorking),
-              icon: const Icon(Icons.timeline),
+              tooltip: 'Pomiar odległości (linijka)',
+              onPressed: _startMeasure,
+              icon: const Icon(Icons.straighten),
             ),
-            IconButton(
-              tooltip: _showDims ? 'Wymiary: WŁ' : 'Wymiary: WYŁ',
-              isSelected: _showDims,
-              onPressed: () => setState(() => _showDims = !_showDims),
-              icon: const Icon(Icons.square_foot),
+            PopupMenuButton<String>(
+              tooltip: 'Widok',
+              icon: const Icon(Icons.visibility_outlined),
+              onSelected: (v) {
+                if (v == 'working') {
+                  setState(() => _showWorking = !_showWorking);
+                } else if (v == 'dims') {
+                  setState(() => _showDims = !_showDims);
+                } else if (v == 'layers') {
+                  _visibility();
+                }
+              },
+              itemBuilder: (context) => [
+                CheckedPopupMenuItem(
+                  value: 'working',
+                  checked: _showWorking,
+                  child: const Text('Linie robocze'),
+                ),
+                CheckedPopupMenuItem(
+                  value: 'dims',
+                  checked: _showDims,
+                  child: const Text('Wymiary'),
+                ),
+                const PopupMenuItem(
+                  value: 'layers',
+                  child: ListTile(
+                    leading: Icon(Icons.layers_outlined),
+                    title: Text('Widoczność warstw…'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ),
-            IconButton(
-              tooltip: 'Widoczność geometrii',
-              onPressed: _visibility,
-              icon: const Icon(Icons.layers_outlined),
-            ),
-            IconButton(
-              tooltip: 'Zapisz projekt',
-              onPressed: _save,
-              icon: const Icon(Icons.save_outlined),
+            PopupMenuButton<String>(
+              tooltip: 'Więcej',
+              onSelected: (v) {
+                if (v == 'rename') {
+                  _rename();
+                } else if (v == 'save') {
+                  _save();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'rename',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Zmień nazwę'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'save',
+                  child: ListTile(
+                    leading: Icon(Icons.save_outlined),
+                    title: Text('Zapisz projekt'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
