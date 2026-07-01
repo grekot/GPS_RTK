@@ -1620,6 +1620,9 @@ class _DesignScreenState extends State<DesignScreen> {
 
   Widget _paramRow(DesignElement e) {
     final fields = _paramFields(e);
+    // Element bez parametrów liczbowych (np. linia punkt-punkt) — nic nie rysuj.
+    // (Bez tego `.clamp(1, n)` przy n=0 rzucał ArgumentError „Invalid argument(s): 1".)
+    if (fields.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = 8.0;
