@@ -371,6 +371,47 @@ void main() {
       }
     });
 
+    test('koło względem PUNKTU: środek = wskazany punkt', () {
+      final sq = _square();
+      final d = Design(id: 'D', name: 'd', createdAt: DateTime.utc(2026));
+      final p = sq.points[0];
+      d.elements.add(DesignElement(
+        tool: ToolType.kolo,
+        ref: GeomRef(kind: 'point', frozen: [p.latitude, p.longitude]),
+      )
+        ..radius = 5
+        ..curvePoints = 12);
+      final w = DesignWorld(parcels: [sq], buildings: const [], designs: [d]);
+      final c = w.computeDesign(d);
+      expect(c[0].closed, isTrue);
+      expect(c[0].stake, hasLength(12));
+      final center = w.parcelLocal['P1']![0]; // punkt = wierzchołek 0 działki
+      for (final pt in c[0].stake) {
+        expect((pt - center).length, closeTo(5, 1e-6));
+      }
+    });
+
+    test('łuk względem PUNKTU: pierwszy punkt łuku = wskazany punkt', () {
+      final sq = _square();
+      final d = Design(id: 'D', name: 'd', createdAt: DateTime.utc(2026));
+      final p = sq.points[0];
+      d.elements.add(DesignElement(
+        tool: ToolType.luk,
+        ref: GeomRef(kind: 'point', frozen: [p.latitude, p.longitude]),
+      )
+        ..radius = 5
+        ..curvePoints = 5
+        ..azimuth = 30
+        ..sweep = 90);
+      final w = DesignWorld(parcels: [sq], buildings: const [], designs: [d]);
+      final c = w.computeDesign(d);
+      expect(c[0].closed, isFalse);
+      expect(c[0].stake, hasLength(5));
+      final start = w.parcelLocal['P1']![0];
+      // łuk zaczyna się dokładnie we wskazanym punkcie (środek liczony wstecz).
+      expect((c[0].stake.first - start).length, closeTo(0, 1e-6));
+    });
+
     test('cykl cross-design nie zawiesza — przerywany', () {
       final a = Design(id: 'A', name: 'a', createdAt: DateTime.utc(2026));
       a.elements.add(DesignElement(

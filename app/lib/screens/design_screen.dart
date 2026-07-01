@@ -570,6 +570,13 @@ class _DesignScreenState extends State<DesignScreen> {
     if (hitElem == null || grab == null) return;
     final elem = hitElem;
     final e = _design.elements[elem];
+    // Bez przeciągania: linia punkt-punkt oraz koło/łuk zakotwiczone w punkcie
+    // (nie mają offset/along) — przepuść gest do mapy.
+    if (e.tool == ToolType.liniaPunkty ||
+        ((e.tool == ToolType.kolo || e.tool == ToolType.luk) &&
+            e.ref.kind == 'point')) {
+      return;
+    }
     if (isRight && !e.tool.canResize) return; // resize tylko dla linii
     final seg = _parentSeg(elem);
     if (seg == null) return;
@@ -782,10 +789,14 @@ class _DesignScreenState extends State<DesignScreen> {
       _snack('Dodano linię roboczą (dwuklik usuwa).');
       return;
     }
-    if (_pendingTool == ToolType.punktReczny) {
+    // Punkt ręczny oraz koło/łuk = zakotwiczenie w JEDNYM wskazanym punkcie
+    // (środek koła / początek łuku). Reszta parametrów w panelu.
+    if (_pendingTool == ToolType.punktReczny ||
+        _pendingTool == ToolType.kolo ||
+        _pendingTool == ToolType.luk) {
       final ll = _ll(_snapPoint(local));
       _createElementWith(DesignElement(
-        tool: ToolType.punktReczny,
+        tool: _pendingTool!,
         ref: GeomRef(kind: 'point', frozen: [ll.latitude, ll.longitude]),
       ));
       return;
@@ -1046,7 +1057,12 @@ class _DesignScreenState extends State<DesignScreen> {
         if (_allValidLL(pathLL)) {
           (c.closed ? closedPolys : openLines)
               .add((pts: pathLL, selected: isSel));
-          handleLL.addAll(pathLL);
+          // Uchwyty tylko dla elementów z realnym przeciąganiem (offset/along).
+          // Linia punkt-punkt i koło/łuk „punktowe" ich nie mają.
+          final el = _design.elements[i];
+          if (el.tool != ToolType.liniaPunkty && el.ref.kind != 'point') {
+            handleLL.addAll(pathLL);
+          }
         }
       }
     }
@@ -1351,6 +1367,8 @@ class _DesignScreenState extends State<DesignScreen> {
                           ToolType.liniaPunkty => _lineFirst == null
                               ? 'Wskaż pierwszy punkt'
                               : 'Wskaż drugi punkt',
+                          ToolType.kolo => 'Wskaż środek koła',
+                          ToolType.luk => 'Wskaż początek łuku',
                           _ => 'Wskaż krawędź odniesienia dla: '
                               '${_pendingTool!.label}',
                         },
@@ -1740,8 +1758,9 @@ class _DesignScreenState extends State<DesignScreen> {
           field(_curve, 'Punktów',
               (t) => _editParam(() => e.curvePoints = _parse(t, e.curvePoints)),
               unit: 'pkt'),
-          offsetField,
-          alongField,
+          // offset/along tylko dla koła zakotwiczonego na krawędzi (nie na punkcie).
+          if (e.ref.kind != 'point') offsetField,
+          if (e.ref.kind != 'point') alongField,
         ];
       case ToolType.luk:
         return [
@@ -1755,8 +1774,8 @@ class _DesignScreenState extends State<DesignScreen> {
           field(_curve, 'Punktów',
               (t) => _editParam(() => e.curvePoints = _parse(t, e.curvePoints)),
               unit: 'pkt'),
-          offsetField,
-          alongField,
+          if (e.ref.kind != 'point') offsetField,
+          if (e.ref.kind != 'point') alongField,
         ];
       case ToolType.punktReczny:
       case ToolType.punktGps:

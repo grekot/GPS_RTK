@@ -343,6 +343,17 @@ class DesignWorld {
       final r = offsetRing(ring, e.offset);
       return ComputedElement(r, r, true);
     }
+    // Koło / łuk zakotwiczone w PUNKCIE: środek koła = punkt, początek łuku =
+    // punkt (środek liczony wstecz z azymutu). Bez krawędzi/offset/along.
+    if ((e.tool == ToolType.kolo || e.tool == ToolType.luk) &&
+        e.ref.kind == 'point') {
+      final f = e.ref.frozen;
+      if (f == null || f.length < 2) return empty;
+      final p = frame.toLocal(LatLng(f[0], f[1]));
+      if (e.tool == ToolType.kolo) return _circleAt(p, e);
+      final a0 = e.azimuth * pi / 180;
+      return _arcFrom(p - Vec2(sin(a0), cos(a0)) * e.radius, e);
+    }
     final seg = refSegOf(e.ref, own, visiting);
     if (seg == null) return empty;
     final (a, b) = seg;
@@ -376,25 +387,9 @@ class DesignWorld {
         final end = start + Vec2(sin(az), cos(az)) * e.length;
         return ComputedElement([start, end], [start, end], false);
       case ToolType.kolo:
-        final c = t(a);
-        final n = e.curvePoints.round().clamp(3, 720);
-        final pts = [
-          for (var i = 0; i < n; i++)
-            c + Vec2(sin(2 * pi * i / n), cos(2 * pi * i / n)) * e.radius,
-        ];
-        return ComputedElement(pts, pts, true);
+        return _circleAt(t(a), e); // środek na krawędzi (offset/along)
       case ToolType.luk:
-        final c = t(a);
-        final n = e.curvePoints.round().clamp(2, 720);
-        final a0 = e.azimuth * pi / 180;
-        final sw = e.sweep * pi / 180;
-        final pts = [
-          for (var i = 0; i < n; i++)
-            c +
-                Vec2(sin(a0 + sw * i / (n - 1)), cos(a0 + sw * i / (n - 1))) *
-                    e.radius,
-        ];
-        return ComputedElement(pts, pts, false);
+        return _arcFrom(t(a), e); // start łuku na krawędzi (offset/along)
       case ToolType.liniaPunkty:
         // Odcinek między dwoma zamrożonymi punktami (ref = frozen [a,b]),
         // bez offset/along — po prostu łączy wskazane punkty.
@@ -405,6 +400,32 @@ class DesignWorld {
       case ToolType.punktPrzeciecie:
         return empty; // obsłużone wyżej
     }
+  }
+
+  /// Koło o środku [center]: [DesignElement.curvePoints] pkt (clamp 3–720) na
+  /// obwodzie o promieniu [DesignElement.radius]. Zamknięte.
+  ComputedElement _circleAt(Vec2 center, DesignElement e) {
+    final n = e.curvePoints.round().clamp(3, 720);
+    final pts = [
+      for (var i = 0; i < n; i++)
+        center + Vec2(sin(2 * pi * i / n), cos(2 * pi * i / n)) * e.radius,
+    ];
+    return ComputedElement(pts, pts, true);
+  }
+
+  /// Łuk o środku [center]: [DesignElement.curvePoints] pkt (clamp 2–720) od
+  /// azymutu startu przez rozwarcie [DesignElement.sweep]. Otwarty.
+  ComputedElement _arcFrom(Vec2 center, DesignElement e) {
+    final n = e.curvePoints.round().clamp(2, 720);
+    final a0 = e.azimuth * pi / 180;
+    final sw = e.sweep * pi / 180;
+    final pts = [
+      for (var i = 0; i < n; i++)
+        center +
+            Vec2(sin(a0 + sw * i / (n - 1)), cos(a0 + sw * i / (n - 1))) *
+                e.radius,
+    ];
+    return ComputedElement(pts, pts, false);
   }
 
   /// Wszystkie krawędzie odniesienia dla edytowanego [current] (jego własne

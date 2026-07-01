@@ -59,11 +59,40 @@ void main() async {
   // Przepnij wbudowany cache kafelków na trwały katalog (offline po restarcie).
   await MapCache.init();
   await AppSettings.load();
+  // Ukryj paski systemowe (m.in. dolny pasek nawigacji) — więcej miejsca na mapę.
+  // Tryb „sticky": paski pojawiają się po przeciągnięciu palcem od krawędzi i
+  // po chwili znów się chowają. Na desktopie to no-op.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const GpsRtkApp());
 }
 
-class GpsRtkApp extends StatelessWidget {
+class GpsRtkApp extends StatefulWidget {
   const GpsRtkApp({super.key});
+
+  @override
+  State<GpsRtkApp> createState() => _GpsRtkAppState();
+}
+
+class _GpsRtkAppState extends State<GpsRtkApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Po powrocie z tła system potrafi przywrócić paski — wymuś tryb ponownie.
+    if (state == AppLifecycleState.resumed) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
