@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui show Path;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -587,6 +588,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                   child: _StakeoutPanel(
                     position: p,
                     heading: _effectiveHeading,
+                    compassAlive: _deviceHeading != null,
                     error: _error,
                     target: _target,
                     label: _targetLabel,
@@ -637,6 +639,7 @@ class _StakeoutPanel extends StatelessWidget {
   const _StakeoutPanel({
     required this.position,
     required this.heading,
+    required this.compassAlive,
     required this.error,
     required this.target,
     required this.label,
@@ -648,6 +651,10 @@ class _StakeoutPanel extends StatelessWidget {
 
   final RtkPosition? position;
   final double? heading;
+
+  /// Czy [heading] pochodzi z kompasu (magnetometru)? Gdy nie — to kurs z GPS,
+  /// który aktualizuje się TYLKO w ruchu (na stojąco tarcza zamiera).
+  final bool compassAlive;
   final String? error;
   final LatLng target;
   final String label;
@@ -725,6 +732,21 @@ class _StakeoutPanel extends StatelessWidget {
                   cue,
                   style: theme.textTheme.titleMedium,
                 ),
+                // Odchyłka w układzie CIAŁA (dokąd przesunąć tyczkę względem
+                // kierunku patrzenia) — czytelniejsza niż statyczne N/E.
+                if (hasHeading && !arrived)
+                  Builder(builder: (context) {
+                    final fr =
+                        forwardRight(offset.north, offset.east, heading!);
+                    return Text(
+                      '${fr.forward >= 0 ? '↑ przód' : '↓ tył'} '
+                      '${formatDistance(fr.forward.abs())} · '
+                      '${fr.right >= 0 ? '→ w prawo' : '← w lewo'} '
+                      '${formatDistance(fr.right.abs())}',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    );
+                  }),
                 const SizedBox(height: 4),
                 Text(
                   '${offset.north >= 0 ? 'N' : 'S'} '
@@ -735,7 +757,7 @@ class _StakeoutPanel extends StatelessWidget {
                 ),
                 Text(
                   '±${p.accuracy.toStringAsFixed(2)} m · ${_fixLabel(p.fixType)}'
-                  '${hasHeading ? '' : ' · brak kompasu'}',
+                  '${!hasHeading ? ' · brak kompasu' : compassAlive ? '' : ' · kierunek z GPS (odświeża się w ruchu)'}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
@@ -820,7 +842,8 @@ class _GuidanceIndicator extends StatelessWidget {
     final dirDeg = hasHeading ? relativeBearing(bearing, heading!) : bearing;
     final angleRad = dirDeg * pi / 180;
 
-    final Widget core = distance >= _nearThreshold
+    final isArrow = distance >= _nearThreshold;
+    final Widget core = isArrow
         ? Transform.rotate(
             angle: angleRad,
             child: Icon(Icons.navigation, size: 96, color: color),
@@ -830,6 +853,7 @@ class _GuidanceIndicator extends StatelessWidget {
             painter: _BullseyePainter(
               distance: distance,
               angleRad: angleRad,
+              headingRad: hasHeading ? heading! * pi / 180 : null,
               color: color,
               gridColor: gridColor,
               textColor: textColor,
@@ -843,7 +867,9 @@ class _GuidanceIndicator extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           core,
-          if (!hasHeading)
+          // „N" nad strzałką tylko bez kompasu (strzałka wskazuje wtedy
+          // względem północy); tarcza rysuje własną różę kierunków.
+          if (!hasHeading && isArrow)
             Positioned(
               top: 0,
               child: Text(
@@ -865,6 +891,7 @@ class _BullseyePainter extends CustomPainter {
   _BullseyePainter({
     required this.distance,
     required this.angleRad,
+    required this.headingRad,
     required this.color,
     required this.gridColor,
     required this.textColor,
@@ -872,6 +899,7 @@ class _BullseyePainter extends CustomPainter {
 
   final double distance;
   final double angleRad; // 0 = góra
+  final double? headingRad; // kierunek patrzenia (null = tarcza północą do góry)
   final Color color;
   final Color gridColor;
   final Color textColor;
@@ -898,7 +926,52 @@ class _BullseyePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, center + Offset(-tp.width / 2, -r * scale - tp.height));
+      // Etykiety pierścieni na skosie (45° w prawo-górę), by nie kolidowały
+      // z obracaną różą kierunków (litery N/E/S/W).
+      final lr = r * scale * 0.7071;
+      tp.paint(canvas, center + Offset(lr - tp.width / 2, -lr - tp.height / 2));
+    }
+
+    // Róża kierunków: litery N/E/S/W + kreski co 45°, obracane tak, by góra
+    // tarczy = kierunek patrzenia (jak obrotowa tarcza kompasu). Bez kompasu
+    // (headingRad == null) róża stoi północą do góry.
+    final rot = headingRad ?? 0;
+    final tickPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1.5;
+    for (var k = 0; k < 8; k++) {
+      final a = k * pi / 4 - rot; // azymut świata → kąt na ekranie
+      final dir = Offset(sin(a), -cos(a));
+      canvas.drawLine(
+          center + dir * (maxR - 4), center + dir * maxR, tickPaint);
+    }
+    const letters = [('N', 0.0), ('E', 90.0), ('S', 180.0), ('W', 270.0)];
+    for (final (txt, azDeg) in letters) {
+      final a = azDeg * pi / 180 - rot;
+      final pos = center + Offset(sin(a), -cos(a)) * (maxR + 7);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: txt,
+          style: TextStyle(
+            color: txt == 'N' ? color : textColor,
+            fontSize: 10,
+            fontWeight: txt == 'N' ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, pos + Offset(-tp.width / 2, -tp.height / 2));
+    }
+
+    // Klin „patrzysz w tę stronę" — stały, na górze tarczy (tylko z kompasem).
+    if (headingRad != null) {
+      // ui.Path — bo latlong2 też eksportuje typ „Path" (kolizja nazw).
+      final wedge = ui.Path()
+        ..moveTo(center.dx, center.dy - maxR + 2)
+        ..lineTo(center.dx - 5, center.dy - maxR - 8)
+        ..lineTo(center.dx + 5, center.dy - maxR - 8)
+        ..close();
+      canvas.drawPath(wedge, Paint()..color = color);
     }
 
     // Środek = Twoja pozycja (krzyżyk).
@@ -933,5 +1006,6 @@ class _BullseyePainter extends CustomPainter {
   bool shouldRepaint(covariant _BullseyePainter old) =>
       old.distance != distance ||
       old.angleRad != angleRad ||
+      old.headingRad != headingRad ||
       old.color != color;
 }

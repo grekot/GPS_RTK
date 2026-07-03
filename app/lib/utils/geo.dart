@@ -123,6 +123,19 @@ bool isValidLatLng(double lat, double lon) =>
     lat.abs() <= 90 &&
     lon.abs() <= 180;
 
+/// Rozkłada odchyłkę w układzie świata (north/east, metry) na układ CIAŁA
+/// obserwatora patrzącego w [headingDeg]: `forward` = do przodu (ujemne = za
+/// plecami), `right` = w prawo (ujemne = w lewo). Do prowadzenia tyczki:
+/// „przód 0,32 m · w prawo 0,08 m" zamiast statycznych N/E.
+({double forward, double right}) forwardRight(
+    double north, double east, double headingDeg) {
+  final h = headingDeg * pi / 180;
+  return (
+    forward: north * cos(h) + east * sin(h),
+    right: east * cos(h) - north * sin(h),
+  );
+}
+
 /// Czy lista współrzędnych NIE jest pusta i wszystkie punkty są poprawne.
 /// PUSTA lista → `false`: `Iterable.every` zwraca `true` dla pustej, więc
 /// `pts.every(isValidLatLng)` przepuszczał `[]` → `Polygon(points: [])`, którego

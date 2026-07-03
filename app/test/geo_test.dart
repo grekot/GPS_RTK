@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -160,6 +162,32 @@ void main() {
     expect(isValidLatLng(49, 200), isFalse);
     expect(isValidLatLng(double.nan, 20), isFalse);
     expect(isValidLatLng(double.infinity, 20), isFalse);
+  });
+
+  group('forwardRight — odchyłka w układzie ciała (tyczenie)', () {
+    test('patrzę na północ → przód=N, prawo=E', () {
+      final r = forwardRight(2.0, 0.5, 0);
+      expect(r.forward, closeTo(2.0, 1e-9));
+      expect(r.right, closeTo(0.5, 1e-9));
+    });
+
+    test('patrzę na wschód → cel na północy jest po LEWEJ', () {
+      final r = forwardRight(1.0, 0.0, 90);
+      expect(r.forward, closeTo(0, 1e-9));
+      expect(r.right, closeTo(-1.0, 1e-9)); // w lewo
+    });
+
+    test('patrzę na południe → cel na północy jest ZA MNĄ', () {
+      final r = forwardRight(1.0, 0.0, 180);
+      expect(r.forward, closeTo(-1.0, 1e-9)); // tył
+      expect(r.right.abs(), closeTo(0, 1e-9));
+    });
+
+    test('długość wektora zachowana (czysty obrót)', () {
+      final r = forwardRight(3.0, 4.0, 137);
+      expect(sqrt(r.forward * r.forward + r.right * r.right),
+          closeTo(5.0, 1e-9));
+    });
   });
 
   group('allValidLatLng — strażnik warstw mapy', () {
