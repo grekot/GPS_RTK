@@ -149,6 +149,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late PositionSource _source = _sources.first;
   StreamSubscription<RtkPosition>? _subscription;
   RtkPosition? _position;
+
+  // Watchdog świeżości: licznik sekund od ostatniej pozycji (zerowany przy
+  // każdej nowej). Licznik tyknięć zamiast DateTime.now() — testowalny
+  // sztucznym zegarem i odporny na zmianę czasu systemowego.
+  Timer? _staleTimer;
+  int _staleTicks = 0;
   String? _error;
   bool _followPosition = true;
   bool _busy = false;
@@ -537,14 +543,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool get _isRunning => _subscription != null;
 
+  /// Sekundy od ostatniej pozycji, gdy dane są już nieświeże (inaczej null).
+  int? get _staleSeconds => _isRunning &&
+          _position != null &&
+          _staleTicks >= positionStaleSeconds
+      ? _staleTicks
+      : null;
+
   void _start() {
     setState(() => _error = null);
     if (AppSettings.instance.keepAwake) WakelockPlus.enable();
+    _staleTicks = 0;
+    _staleTimer?.cancel();
+    _staleTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _staleTicks++;
+      // Przerysowanie tylko gdy ostrzeżenie widoczne (aktualizacja licznika).
+      if (_staleSeconds != null && mounted) setState(() {});
+    });
     _subscription = _source.positions().listen(
       (p) {
         // Strażnik: odrzuć przekłamaną pozycję, by nie zatruć kamery mapy
         // (lat > 90 → asercja flutter_map). Parser i tak powinien ją odrzucić.
         if (!isValidLatLng(p.latitude, p.longitude)) return;
+        _staleTicks = 0;
         setState(() => _position = p);
         if (_followPosition) {
           _mapController.move(
@@ -559,6 +580,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       onError: (Object e) {
+        // Strumień broadcast nie kończy subskrypcji przy błędzie — anuluj
+        // jawnie, żeby licznik słuchaczy źródła spadł do zera i połączenie
+        // zostało zamknięte (inaczej kolejny Start nie odpaliłby connect()).
+        _subscription?.cancel();
+        _staleTimer?.cancel();
+        _staleTimer = null;
         setState(() {
           _error = e is StateError || e is UnimplementedError
               ? e.toString().replaceFirst(RegExp(r'^[^:]+: '), '')
@@ -572,6 +599,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _stop() async {
     WakelockPlus.disable();
+    _staleTimer?.cancel();
+    _staleTimer = null;
     await _subscription?.cancel();
     setState(() {
       _subscription = null;
@@ -1668,6 +1697,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _staleTimer?.cancel();
     _subscription?.cancel();
     _bleStatusSub?.cancel();
     _usbStatusSub?.cancel();
@@ -2112,6 +2142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     position: p,
                     error: _error,
                     isRunning: _isRunning,
+                    staleSeconds: _staleSeconds,
                     telemetry:
                         identical(_source, _bleSource) ? _telemetry : null,
                   ),
@@ -2131,6 +2162,7 @@ class _StatusCard extends StatelessWidget {
     required this.position,
     required this.error,
     required this.isRunning,
+    this.staleSeconds,
     this.telemetry,
   });
 
@@ -2138,6 +2170,10 @@ class _StatusCard extends StatelessWidget {
   final RtkPosition? position;
   final String? error;
   final bool isRunning;
+
+  /// Sekundy od ostatniej pozycji, gdy strumień „zamarł" (null = dane świeże).
+  /// Ostatni znany fix jest wtedy nieaktualny — nie pokazujemy go jako żywego.
+  final int? staleSeconds;
   final DeviceTelemetry? telemetry;
 
   static const _fixLabels = {
@@ -2159,6 +2195,7 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = position;
+    final stale = staleSeconds != null;
     return Card(
       elevation: 4,
       child: Padding(
@@ -2171,11 +2208,15 @@ class _StatusCard extends StatelessWidget {
               children: [
                 Chip(
                   label: Text(
-                    p == null ? 'Brak pozycji' : _fixLabels[p.fixType]!,
+                    p == null
+                        ? 'Brak pozycji'
+                        : stale
+                            ? 'Brak danych'
+                            : _fixLabels[p.fixType]!,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                   backgroundColor:
-                      p == null ? Colors.grey : _fixColors[p.fixType],
+                      p == null || stale ? Colors.grey : _fixColors[p.fixType],
                   visualDensity: VisualDensity.compact,
                 ),
                 const SizedBox(width: 8),
@@ -2215,6 +2256,13 @@ class _StatusCard extends StatelessWidget {
                 '${p.satellites != null ? '   sat.: ${p.satellites}' : ''}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (stale)
+                Text(
+                  'Brak nowych pozycji od $staleSeconds s — sprawdź połączenie '
+                  'z odbiornikiem (Stop i Start łączy ponownie).',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
             ],
             if (telemetry != null && error == null) ...[
               const SizedBox(height: 6),

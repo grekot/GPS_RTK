@@ -21,7 +21,7 @@ const _statusChar = '6e400004-b5a3-f393-e0a9-e50e24dcca9e';
 /// Odbiornik RTK (ESP32 + LC29HEA) po BLE — usługa Nordic UART.
 /// Po połączeniu czyta NMEA (→ [RtkPosition]) i — jeśli skonfigurowano NTRIP —
 /// pobiera RTCM z castera i wpuszcza do modułu (oraz odsyła GGA do VRS).
-class BleReceiverSource implements PositionSource {
+class BleReceiverSource extends SharedPositionSource {
   @override
   String get name => 'Odbiornik RTK (BLE)';
 
@@ -48,16 +48,7 @@ class BleReceiverSource implements PositionSource {
   StreamSubscription<List<int>>? _statusSub;
 
   @override
-  Stream<RtkPosition> positions() {
-    late final StreamController<RtkPosition> ctrl;
-    ctrl = StreamController<RtkPosition>(
-      onListen: () => _connect(ctrl),
-      onCancel: _disconnect,
-    );
-    return ctrl.stream;
-  }
-
-  Future<void> _connect(StreamController<RtkPosition> ctrl) async {
+  Future<void> connect(StreamController<RtkPosition> ctrl, int epoch) async {
     try {
       if (!await FlutterBluePlus.isSupported) {
         ctrl.addError(StateError('Bluetooth niedostępny na tym urządzeniu.'));
@@ -83,6 +74,7 @@ class BleReceiverSource implements PositionSource {
             onTimeout: () => throw StateError('Nie znaleziono odbiornika RTK.'),
           );
       await FlutterBluePlus.stopScan();
+      if (!epochActive(epoch)) return;
 
       final device = result.device;
       _device = device;
@@ -92,6 +84,13 @@ class BleReceiverSource implements PositionSource {
         timeout: const Duration(seconds: 15),
         mtu: 247,
       );
+      if (!epochActive(epoch)) {
+        // Słuchacze odpadli w trakcie łączenia — nie zostawiaj połączenia.
+        try {
+          await device.disconnect();
+        } catch (_) {}
+        return;
+      }
 
       final services = await device.discoverServices();
       final nus = services.firstWhere((s) => s.uuid == svc,
@@ -103,6 +102,7 @@ class BleReceiverSource implements PositionSource {
       await tx.setNotifyValue(true);
       _txSub = tx.onValueReceived.listen((bytes) => _onNmeaBytes(bytes, ctrl));
       await _subscribeStatus(services);
+      if (!epochActive(epoch)) return; // disconnect() już sprząta
       _status.add('Połączono z odbiornikiem');
       _maybeStartNtrip();
     } catch (e) {
@@ -153,6 +153,7 @@ class BleReceiverSource implements PositionSource {
   }
 
   void _maybeStartNtrip() {
+    if (_ntrip != null) return; // już działa — nie dubluj klienta ani timera GGA
     final cfg = ntripConfig;
     if (cfg == null || !cfg.isComplete) return;
     _ntrip = NtripClient(
@@ -197,7 +198,8 @@ class BleReceiverSource implements PositionSource {
     }
   }
 
-  Future<void> _disconnect() async {
+  @override
+  Future<void> disconnect() async {
     _ggaTimer?.cancel();
     _ggaTimer = null;
     await _ntrip?.stop();

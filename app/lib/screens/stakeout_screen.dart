@@ -84,6 +84,12 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   StreamSubscription<RtkPosition>? _subscription;
   StreamSubscription<CompassEvent>? _compassSub;
   RtkPosition? _position;
+
+  // Watchdog świeżości: sekundy od ostatniej pozycji (jak na ekranie głównym).
+  // W terenie zamrożony strumień z zieloną plakietką „RTK Fixed" oznaczał
+  // tyczenie po nieaktualnej pozycji — teraz panel to wykrzykuje.
+  Timer? _staleTimer;
+  int _staleTicks = 0;
   double? _deviceHeading; // kierunek z kompasu (magnetometru), stopnie 0–360
   String? _error;
   int _targetIndex = 0;
@@ -119,6 +125,12 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   /// na stojąco), w razie braku — kurs z GPS (tylko podczas ruchu).
   double? get _effectiveHeading => _deviceHeading ?? _position?.heading;
 
+  /// Sekundy od ostatniej pozycji, gdy dane są już nieświeże (inaczej null).
+  int? get _staleSeconds =>
+      _position != null && _staleTicks >= positionStaleSeconds
+          ? _staleTicks
+          : null;
+
   @override
   void initState() {
     super.initState();
@@ -132,6 +144,11 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
         });
       },
     );
+    _staleTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _staleTicks++;
+      // Przerysowanie tylko gdy ostrzeżenie widoczne (aktualizacja licznika).
+      if (_staleSeconds != null && mounted) setState(() {});
+    });
     // Kompas: dostępny tylko na urządzeniach mobilnych. Na desktopie/web
     // strumień jest null — wtedy prowadzenie działa względem północy.
     final compass = FlutterCompass.events;
@@ -158,6 +175,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   }
 
   void _onPosition(RtkPosition p) {
+    _staleTicks = 0;
     setState(() {
       _position = p;
       _error = null;
@@ -404,6 +422,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
 
   @override
   void dispose() {
+    _staleTimer?.cancel();
     _subscription?.cancel();
     _compassSub?.cancel();
     super.dispose();
@@ -589,6 +608,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                     position: p,
                     heading: _effectiveHeading,
                     compassAlive: _deviceHeading != null,
+                    staleSeconds: _staleSeconds,
                     error: _error,
                     target: _target,
                     label: _targetLabel,
@@ -640,6 +660,7 @@ class _StakeoutPanel extends StatelessWidget {
     required this.position,
     required this.heading,
     required this.compassAlive,
+    required this.staleSeconds,
     required this.error,
     required this.target,
     required this.label,
@@ -655,6 +676,10 @@ class _StakeoutPanel extends StatelessWidget {
   /// Czy [heading] pochodzi z kompasu (magnetometru)? Gdy nie — to kurs z GPS,
   /// który aktualizuje się TYLKO w ruchu (na stojąco tarcza zamiera).
   final bool compassAlive;
+
+  /// Sekundy od ostatniej pozycji, gdy strumień „zamarł" (null = dane świeże).
+  /// Wskazówki tyczenia liczą się wtedy z nieaktualnej pozycji.
+  final int? staleSeconds;
   final String? error;
   final LatLng target;
   final String label;
@@ -756,10 +781,21 @@ class _StakeoutPanel extends StatelessWidget {
                   style: theme.textTheme.bodySmall,
                 ),
                 Text(
-                  '±${p.accuracy.toStringAsFixed(2)} m · ${_fixLabel(p.fixType)}'
-                  '${!hasHeading ? ' · brak kompasu' : compassAlive ? '' : ' · kierunek z GPS (odświeża się w ruchu)'}',
+                  staleSeconds != null
+                      ? '±${p.accuracy.toStringAsFixed(2)} m · brak danych'
+                      : '±${p.accuracy.toStringAsFixed(2)} m · ${_fixLabel(p.fixType)}'
+                          '${!hasHeading ? ' · brak kompasu' : compassAlive ? '' : ' · kierunek z GPS (odświeża się w ruchu)'}',
                   style: theme.textTheme.bodySmall,
                 ),
+                if (staleSeconds != null)
+                  Text(
+                    'Brak nowych pozycji od $staleSeconds s — pozycja '
+                    'zamrożona, sprawdź połączenie z odbiornikiem.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
               ],
             ),
           ),

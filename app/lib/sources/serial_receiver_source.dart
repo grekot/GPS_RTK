@@ -18,7 +18,7 @@ import 'position_source.dart';
 /// Przepływ jak w BLE/USB: bajty z portu → linie NMEA → [RtkPosition];
 /// RTCM z castera NTRIP → zapis do portu; GGA odsyłane do castera (VRS).
 /// Brak telemetrii (`DeviceTelemetry`) — to rozszerzenie BLE; status z NMEA.
-class SerialReceiverSource implements PositionSource {
+class SerialReceiverSource extends SharedPositionSource {
   @override
   String get name => 'Odbiornik RTK (COM)';
 
@@ -56,17 +56,10 @@ class SerialReceiverSource implements PositionSource {
     return out;
   }
 
+  // Cała ścieżka łączenia jest synchroniczna (libserialport) — [epoch] nie
+  // zdąży się zmienić w trakcie, więc nie wymaga sprawdzeń jak w BLE/USB.
   @override
-  Stream<RtkPosition> positions() {
-    late final StreamController<RtkPosition> ctrl;
-    ctrl = StreamController<RtkPosition>(
-      onListen: () => _connect(ctrl),
-      onCancel: _disconnect,
-    );
-    return ctrl.stream;
-  }
-
-  Future<void> _connect(StreamController<RtkPosition> ctrl) async {
+  Future<void> connect(StreamController<RtkPosition> ctrl, int epoch) async {
     try {
       final ports = SerialPort.availablePorts;
       if (ports.isEmpty) {
@@ -135,6 +128,7 @@ class SerialReceiverSource implements PositionSource {
   }
 
   void _maybeStartNtrip() {
+    if (_ntrip != null) return; // już działa — nie dubluj klienta ani timera GGA
     final cfg = ntripConfig;
     if (cfg == null || !cfg.isComplete) return;
     _ntrip = NtripClient(
@@ -170,10 +164,11 @@ class SerialReceiverSource implements PositionSource {
     if (port == null) return;
     try {
       port.write(Uint8List.fromList(rtcm), timeout: 1000);
-    } catch (_) {/* port zniknął — _disconnect posprząta */}
+    } catch (_) {/* port zniknął — disconnect posprząta */}
   }
 
-  Future<void> _disconnect() async {
+  @override
+  Future<void> disconnect() async {
     _ggaTimer?.cancel();
     _ggaTimer = null;
     await _ntrip?.stop();

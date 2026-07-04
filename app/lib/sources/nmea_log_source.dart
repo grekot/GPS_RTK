@@ -36,13 +36,25 @@ class NmeaLogSource implements PositionSource {
 
     Future<void> playLog(List<String> log) async {
       while (running) {
+        var emitted = 0;
         for (final line in log) {
           if (!running || ctrl.isClosed) return;
           final pos = parser.addLine(line);
           if (pos != null) {
+            emitted++;
             ctrl.add(pos);
             await Future<void>.delayed(interval);
           }
+        }
+        // Cały przebieg bez ani jednej pozycji (np. log bez sum kontrolnych,
+        // które parser odrzuca) — zgłoś błąd zamiast kręcić się bez `await`
+        // w nieskończonej pętli, która zawiesiłaby całą aplikację.
+        if (emitted == 0) {
+          if (!ctrl.isClosed) {
+            ctrl.addError(StateError(
+                'Log NMEA nie zawiera poprawnych zdań GGA z sumą kontrolną.'));
+          }
+          return;
         }
       }
     }

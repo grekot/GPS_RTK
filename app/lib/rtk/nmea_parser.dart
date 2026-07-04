@@ -35,7 +35,7 @@ String buildGgaSentence(
 
 /// Parser strumienia NMEA z odbiornika GNSS. Akumuluje stan między zdaniami:
 /// GGA daje pozycję i typ fixa, GST dokładność, RMC kurs. Pozycję emituje przy
-/// zdaniu GGA. Weryfikuje sumę kontrolną (gdy obecna).
+/// zdaniu GGA. Wymaga poprawnej sumy kontrolnej `*HH`.
 class NmeaParser {
   double? _accuracy; // z GST [m]
   double? _course; // z RMC [°]
@@ -156,10 +156,13 @@ class NmeaParser {
   }
 
   /// Weryfikuje sumę kontrolną NMEA (XOR znaków między `$` a `*`).
-  /// Gdy zdanie nie zawiera `*HH`, akceptuje (niektóre strumienie ją pomijają).
+  /// Zdanie **bez** `*HH` odrzucamy: odbiornik zawsze ją wysyła, a brak
+  /// gwiazdki to niemal na pewno ucięta/sklejona linia (zgubione bajty na USB
+  /// przy 460800 bps). Przepuszczanie takich zdań dawało „odskoki" pozycji
+  /// przy wciąż pokazywanym RTK Fixed.
   static bool _checksumOk(String line) {
     final star = line.indexOf('*');
-    if (star == -1 || star + 3 > line.length) return true;
+    if (star == -1 || star + 3 > line.length) return false;
     var x = 0;
     for (var i = 1; i < star; i++) {
       x ^= line.codeUnitAt(i);

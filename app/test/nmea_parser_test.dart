@@ -74,6 +74,23 @@ void main() {
     expect(p!.heading, closeTo(87.5, 1e-6));
   });
 
+  // Zgubione bajty na USB (460800 bps) ucinają linię razem z `*HH`. Taka
+  // linia NIE może przejść bez weryfikacji — przekłamane cyfry współrzędnych
+  // w zakresie ±90/±180 dawały „odskok" pozycji przy pokazywanym RTK Fixed.
+  test('GGA bez sumy kontrolnej (ucięta linia) → odrzucona', () {
+    final p = NmeaParser().addLine(
+        r'$GNGGA,120000.00,5000.000000,N,02000.000000,E,4,18,0.7,250.0,M,40,M,1.0,0000');
+    expect(p, isNull);
+  });
+
+  test('GGA z przekłamaną szerokością i uciętą sumą → odrzucona', () {
+    // Poprawne zdanie, w którym transmisja przekłamała cyfrę (50→51) i ucięła
+    // końcówkę — bez wymogu `*HH` parser by to przyjął jako skok o ~111 km.
+    final p = NmeaParser().addLine(
+        r'$GNGGA,120000.00,5100.000000,N,02000.000000,E,4,18,0.7,250.0,M,40,M,1.0');
+    expect(p, isNull);
+  });
+
   test('śmieci i niepełne zdania nie wywracają parsera', () {
     final parser = NmeaParser();
     expect(parser.addLine(''), isNull);

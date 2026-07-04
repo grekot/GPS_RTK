@@ -26,6 +26,12 @@ String fixLabel(FixType f) => switch (f) {
       FixType.rtkFixed => 'RTK Fixed',
     };
 
+/// Po ilu sekundach bez nowej pozycji uznajemy dane za nieświeże. UI pokazuje
+/// wtedy „brak danych" zamiast ostatniego (już nieaktualnego) statusu fixa —
+/// zamrożona pozycja z zieloną plakietką „RTK Fixed" wprowadzała w błąd.
+/// Odbiornik nadaje 1–10 Hz, więc 5 s to bezpieczny margines.
+const int positionStaleSeconds = 5;
+
 /// Pozycja niezależna od źródła (GPS telefonu / odbiornik RTK po BLE).
 class RtkPosition {
   final double latitude;

@@ -24,7 +24,7 @@ import 'position_source.dart';
 ///
 /// **Tylko Android.** Na iOS/desktopie [positions] od razu zgłasza błąd —
 /// `usb_serial` ma natywną część wyłącznie dla Androida.
-class UsbReceiverSource implements PositionSource {
+class UsbReceiverSource extends SharedPositionSource {
   @override
   String get name => 'Odbiornik RTK (USB)';
 
@@ -43,16 +43,7 @@ class UsbReceiverSource implements PositionSource {
   StreamSubscription<Uint8List>? _portSub;
 
   @override
-  Stream<RtkPosition> positions() {
-    late final StreamController<RtkPosition> ctrl;
-    ctrl = StreamController<RtkPosition>(
-      onListen: () => _connect(ctrl),
-      onCancel: _disconnect,
-    );
-    return ctrl.stream;
-  }
-
-  Future<void> _connect(StreamController<RtkPosition> ctrl) async {
+  Future<void> connect(StreamController<RtkPosition> ctrl, int epoch) async {
     if (!Platform.isAndroid) {
       ctrl.addError(StateError(
           'Połączenie USB jest dostępne tylko na Androidzie — użyj BLE.'));
@@ -61,6 +52,7 @@ class UsbReceiverSource implements PositionSource {
     try {
       _status.add('Szukam odbiornika na USB…');
       final devices = await UsbSerial.listDevices();
+      if (!epochActive(epoch)) return;
       if (devices.isEmpty) {
         ctrl.addError(StateError(
             'Nie znaleziono urządzenia USB. Podłącz moduł kablem OTG '
@@ -73,14 +65,19 @@ class UsbReceiverSource implements PositionSource {
         ctrl.addError(StateError('Nie udało się utworzyć portu USB.'));
         return;
       }
-      _port = port;
       // open() wywołuje systemowy dialog uprawnienia USB (obsługuje usb_serial).
       final opened = await port.open();
+      if (!epochActive(epoch)) {
+        // Słuchacze odpadli w trakcie łączenia — nie zostawiaj otwartego portu.
+        if (opened) await port.close();
+        return;
+      }
       if (!opened) {
         ctrl.addError(StateError(
             'Brak dostępu do portu USB (odmówiono uprawnienia?).'));
         return;
       }
+      _port = port;
       await port.setDTR(true);
       await port.setRTS(true);
       await port.setPortParameters(
@@ -124,6 +121,7 @@ class UsbReceiverSource implements PositionSource {
   }
 
   void _maybeStartNtrip() {
+    if (_ntrip != null) return; // już działa — nie dubluj klienta ani timera GGA
     final cfg = ntripConfig;
     if (cfg == null || !cfg.isComplete) return;
     _ntrip = NtripClient(
@@ -160,10 +158,11 @@ class UsbReceiverSource implements PositionSource {
     if (port == null) return;
     try {
       await port.write(Uint8List.fromList(rtcm));
-    } catch (_) {/* port zniknął — _disconnect posprząta */}
+    } catch (_) {/* port zniknął — disconnect posprząta */}
   }
 
-  Future<void> _disconnect() async {
+  @override
+  Future<void> disconnect() async {
     _ggaTimer?.cancel();
     _ggaTimer = null;
     await _ntrip?.stop();

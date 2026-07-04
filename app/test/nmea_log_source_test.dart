@@ -17,11 +17,23 @@ void main() {
     final src = NmeaLogSource()
       ..interval = const Duration(milliseconds: 1)
       ..lines = [
-        r'$GPGGA,120000.00,4953.7840,N,02036.9360,E,4,18,0.8,250.0,M,0.0,M,,',
+        // Z sumą kontrolną — parser wymaga `*HH` (odbiornik zawsze ją wysyła).
+        r'$GPGGA,120000.00,4953.7840,N,02036.9360,E,4,18,0.8,250.0,M,0.0,M,,*57',
       ];
     final positions = await src.positions().take(2).toList();
     expect(positions, hasLength(2)); // zapętlone
     expect(positions.first.fixType, FixType.rtkFixed);
     expect(positions.first.latitude, closeTo(49.8964, 1e-3));
+  });
+
+  // Log, którego żadna linia nie przechodzi walidacji (brak `*HH`), musi
+  // zgłosić błąd — a nie zapętlić się na sucho i zawiesić aplikację.
+  test('log bez sum kontrolnych → błąd zamiast wiecznej pętli', () async {
+    final src = NmeaLogSource()
+      ..interval = const Duration(milliseconds: 1)
+      ..lines = [
+        r'$GPGGA,120000.00,4953.7840,N,02036.9360,E,4,18,0.8,250.0,M,0.0,M,,',
+      ];
+    await expectLater(src.positions(), emitsError(isA<StateError>()));
   });
 }

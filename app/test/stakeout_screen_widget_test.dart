@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
@@ -20,6 +22,25 @@ class _FixedSource implements PositionSource {
   @override
   Stream<RtkPosition> positions() => Stream.value(pos);
 }
+
+/// Sztuczne źródło sterowane z testu — pozycje wpuszcza się przez [ctrl].
+class _StreamSource implements PositionSource {
+  final ctrl = StreamController<RtkPosition>.broadcast();
+
+  @override
+  String get name => 'test';
+
+  @override
+  Stream<RtkPosition> positions() => ctrl.stream;
+}
+
+RtkPosition _rtkFixed(LatLng at) => RtkPosition(
+      latitude: at.latitude,
+      longitude: at.longitude,
+      accuracy: 0.02,
+      fixType: FixType.rtkFixed,
+      timestamp: DateTime.utc(2026, 7, 4),
+    );
 
 void main() {
   setUp(() async {
@@ -60,5 +81,44 @@ void main() {
     expect(find.textContaining('↑ przód'), findsOneWidget);
     // Statyczne N/E nadal widoczne jako druga linia (północ ~1 m).
     expect(find.textContaining('N '), findsWidgets);
+  });
+
+  // Watchdog świeżości: gdy strumień pozycji „zamarł" (np. padło połączenie
+  // USB), panel nie może dalej pokazywać zielonego „RTK Fixed" — w terenie
+  // oznaczało to tyczenie po zamrożonej, nieaktualnej pozycji.
+  testWidgets('watchdog: zamrożony strumień → ostrzeżenie zamiast fixa',
+      (tester) async {
+    const target = LatLng(50.0, 20.0);
+    final src = _StreamSource();
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    src.ctrl.add(_rtkFixed(destinationLatLng(target, -1.0, 0)));
+    await tester.pump();
+
+    // Świeże dane: normalny status, bez ostrzeżenia.
+    expect(find.textContaining('RTK Fixed'), findsOneWidget);
+    expect(find.textContaining('Brak nowych pozycji'), findsNothing);
+
+    // 6 s ciszy → ostrzeżenie o zamrożonej pozycji, status fixa znika.
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.textContaining('Brak nowych pozycji od'), findsOneWidget);
+    expect(find.textContaining('RTK Fixed'), findsNothing);
+
+    // Nowa pozycja kasuje ostrzeżenie. Dwa pumpy: pierwszy dostarcza zdarzenie
+    // strumienia (mikrotask → setState), drugi rysuje zaplanowaną klatkę.
+    src.ctrl.add(_rtkFixed(destinationLatLng(target, -2.0, 0)));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('Brak nowych pozycji'), findsNothing);
+    expect(find.textContaining('RTK Fixed'), findsOneWidget);
+
+    await src.ctrl.close();
   });
 }
