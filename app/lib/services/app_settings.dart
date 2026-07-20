@@ -11,6 +11,7 @@ class AppSettings {
     this.keepAwake = true,
     this.ggaSeconds = 10,
     this.usbBaud = 460800,
+    this.compassMirror = false,
   });
 
   /// Liczba epok uśredniania pomiaru punktu.
@@ -29,6 +30,12 @@ class AppSettings {
   /// tyle realnie nadaje nasza płytka LC29HEA (zmierzone na COM3; instrukcja
   /// płytki podawała 115200, ale sprzęt gada 460800). Regulowane w ustawieniach.
   int usbBaud;
+
+  /// Lustrzana korekta kompasu (heading → 360−heading). Niektóre telefony /
+  /// orientacje zwracają kurs odbity — objaw: na tarczy tyczenia E i W są
+  /// zamienione, róża kręci się w złą stronę. Weryfikacja: pełnoekranowa
+  /// tarcza pokazuje odczyt w stopniach — stań twarzą na wschód i porównaj.
+  bool compassMirror;
 
   /// Typowe prędkości portu do wyboru w ustawieniach.
   static const usbBaudOptions = [
@@ -56,6 +63,7 @@ class AppSettings {
       keepAwake: j['keepAwake'] as bool? ?? true,
       ggaSeconds: (j['ggaSeconds'] as num?)?.toInt() ?? 10,
       usbBaud: (j['usbBaud'] as num?)?.toInt() ?? 460800,
+      compassMirror: j['compassMirror'] as bool? ?? false,
     );
   }
 
@@ -71,6 +79,7 @@ class AppSettings {
         'keepAwake': keepAwake,
         'ggaSeconds': ggaSeconds,
         'usbBaud': usbBaud,
+        'compassMirror': compassMirror,
       }),
     );
   }

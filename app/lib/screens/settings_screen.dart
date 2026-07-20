@@ -16,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _keepAwake = AppSettings.instance.keepAwake;
   late int _gga = AppSettings.instance.ggaSeconds;
   late int _usbBaud = AppSettings.instance.usbBaud;
+  late bool _compassMirror = AppSettings.instance.compassMirror;
 
   Future<void> _save() async {
     await AppSettings(
@@ -24,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       keepAwake: _keepAwake,
       ggaSeconds: _gga,
       usbBaud: _usbBaud,
+      compassMirror: _compassMirror,
     ).save();
     if (mounted) Navigator.of(context).pop(true);
   }
@@ -71,6 +73,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Ekran włączony podczas pomiaru w terenie.'),
             value: _keepAwake,
             onChanged: (v) => setState(() => _keepAwake = v),
+          ),
+          SwitchListTile(
+            title: const Text('Kompas: odbicie lustrzane'),
+            subtitle: const Text(
+                'Włącz, gdy na tarczy tyczenia wschód i zachód są zamienione '
+                '(niektóre telefony zwracają odbity kurs). Sprawdź odczyt '
+                'stopni na pełnoekranowej tarczy, stojąc twarzą w znanym '
+                'kierunku.'),
+            value: _compassMirror,
+            onChanged: (v) => setState(() => _compassMirror = v),
           ),
           const Divider(height: 1),
           ListTile(

@@ -190,6 +190,21 @@ void main() {
     });
   });
 
+  group('applyCompassMirror — korekta odbitego kursu', () {
+    test('odbicie zamienia E↔W, N i S bez zmian', () {
+      expect(applyCompassMirror(90, true), 270); // E → W
+      expect(applyCompassMirror(270, true), 90); // W → E
+      expect(applyCompassMirror(0, true), 0); // N zostaje
+      expect(applyCompassMirror(180, true), 180); // S zostaje
+      expect(applyCompassMirror(45, true), 315); // NE → NW
+    });
+
+    test('wyłączona korekta = odczyt bez zmian', () {
+      expect(applyCompassMirror(123.5, false), 123.5);
+      expect(applyCompassMirror(359.9, false), closeTo(359.9, 1e-9));
+    });
+  });
+
   group('allValidLatLng — strażnik warstw mapy', () {
     test('PUSTA lista → false (inaczej Polygon([]) → LatLng(NaN) przy zoomie)', () {
       // Sedno buga: Iterable.every na pustej liście zwraca true.

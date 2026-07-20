@@ -21,7 +21,7 @@ const _statusChar = '6e400004-b5a3-f393-e0a9-e50e24dcca9e';
 /// Odbiornik RTK (ESP32 + LC29HEA) po BLE — usługa Nordic UART.
 /// Po połączeniu czyta NMEA (→ [RtkPosition]) i — jeśli skonfigurowano NTRIP —
 /// pobiera RTCM z castera i wpuszcza do modułu (oraz odsyła GGA do VRS).
-class BleReceiverSource extends SharedPositionSource {
+class BleReceiverSource extends SharedPositionSource implements NtripFlowInfo {
   @override
   String get name => 'Odbiornik RTK (BLE)';
 
@@ -46,6 +46,13 @@ class BleReceiverSource extends SharedPositionSource {
   RtkPosition? _last;
   StreamSubscription<List<int>>? _txSub;
   StreamSubscription<List<int>>? _statusSub;
+  DateTime? _lastRtcmAt;
+
+  @override
+  bool get ntripActive => _ntrip != null;
+
+  @override
+  DateTime? get lastRtcmAt => _lastRtcmAt;
 
   @override
   Future<void> connect(StreamController<RtkPosition> ctrl, int epoch) async {
@@ -104,6 +111,11 @@ class BleReceiverSource extends SharedPositionSource {
       await _subscribeStatus(services);
       if (!epochActive(epoch)) return; // disconnect() już sprząta
       _status.add('Połączono z odbiornikiem');
+      // Włącz raport estymaty błędu pozycji (PQTMEPE @1 Hz) — most ESP32
+      // przekazuje RX → UART modułu; niekrytyczne, gdy się nie uda.
+      try {
+        await _rx?.write(ascii.encode(enableEpeCommand), withoutResponse: true);
+      } catch (_) {}
       _maybeStartNtrip();
     } catch (e) {
       if (!ctrl.isClosed) ctrl.addError(e);
@@ -185,6 +197,7 @@ class BleReceiverSource extends SharedPositionSource {
   }
 
   Future<void> _writeRtcm(List<int> rtcm) async {
+    _lastRtcmAt = DateTime.now();
     final rx = _rx;
     if (rx == null) return;
     const chunk = 180; // pod MTU 247
@@ -204,6 +217,7 @@ class BleReceiverSource extends SharedPositionSource {
     _ggaTimer = null;
     await _ntrip?.stop();
     _ntrip = null;
+    _lastRtcmAt = null;
     await _txSub?.cancel();
     _txSub = null;
     await _statusSub?.cancel();

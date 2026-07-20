@@ -33,11 +33,22 @@ String buildGgaSentence(
   return '\$$body*${NmeaParser.nmeaChecksum(body)}';
 }
 
+/// Buduje pełną komendę NMEA/PQTM (z `$`, sumą `*HH` i CRLF) do wysłania w
+/// port odbiornika, np. `buildNmeaCommand('PQTMCFGMSGRATE,W,PQTMEPE,1,2')`.
+String buildNmeaCommand(String body) =>
+    '\$$body*${NmeaParser.nmeaChecksum(body)}\r\n';
+
+/// Komenda włączająca na LC29H raport estymaty błędu pozycji `PQTMEPE` (1 Hz).
+/// Źródła wysyłają ją po każdym połączeniu — celowo BEZ `PQTMSAVEPAR`
+/// (konfiguracja per-sesja, nie zapisujemy do flash modułu). Jeśli firmware
+/// jej nie zna, po prostu nie odpowie — dokładność wróci do szacunku z HDOP.
+final String enableEpeCommand = buildNmeaCommand('PQTMCFGMSGRATE,W,PQTMEPE,1,2');
+
 /// Parser strumienia NMEA z odbiornika GNSS. Akumuluje stan między zdaniami:
-/// GGA daje pozycję i typ fixa, GST dokładność, RMC kurs. Pozycję emituje przy
-/// zdaniu GGA. Wymaga poprawnej sumy kontrolnej `*HH`.
+/// GGA daje pozycję i typ fixa, GST/PQTMEPE dokładność, RMC kurs. Pozycję
+/// emituje przy zdaniu GGA. Wymaga poprawnej sumy kontrolnej `*HH`.
 class NmeaParser {
-  double? _accuracy; // z GST [m]
+  double? _accuracy; // z GST lub PQTMEPE [m]
   double? _course; // z RMC [°]
 
   /// Dodaje jedną linię NMEA. Zwraca [RtkPosition] dla ważnej GGA, inaczej null.
@@ -56,6 +67,9 @@ class NmeaParser {
       case 'GST':
         _gst(f);
         return null;
+      case 'EPE': // $PQTMEPE — sufiks „EPE" (Quectel, estymata błędu pozycji)
+        _epe(f);
+        return null;
       case 'RMC':
         _rmc(f);
         return null;
@@ -63,6 +77,16 @@ class NmeaParser {
         return _gga(f);
     }
     return null;
+  }
+
+  /// PQTMEPE: MsgVer(1),EPE_North(2),EPE_East(3),EPE_Down(4),EPE_2D(5),EPE_3D(6).
+  /// LC29HEA nie wysyła GST — to jedyna realna estymata błędu z tego modułu
+  /// (włączana komendą [enableEpeCommand]). Bierzemy EPE_2D jako dokładność
+  /// poziomą; rosnące EPE przy „Fixed" = podejrzany (fałszywy) fix.
+  void _epe(List<String> f) {
+    if (f[0] != 'PQTMEPE' || f.length < 6) return;
+    final e2d = double.tryParse(f[5]);
+    if (e2d != null && e2d > 0 && e2d.isFinite) _accuracy = e2d;
   }
 
   void _gst(List<String> f) {

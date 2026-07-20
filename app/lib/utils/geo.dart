@@ -123,6 +123,12 @@ bool isValidLatLng(double lat, double lon) =>
     lat.abs() <= 90 &&
     lon.abs() <= 180;
 
+/// Lustrzana korekta odczytu kompasu: heading → (360 − heading) % 360.
+/// Niektóre telefony/orientacje zwracają kurs odbity (E i W zamienione,
+/// obrót róży w złą stronę) — przełącznik w ustawieniach to prostuje.
+double applyCompassMirror(double headingDeg, bool mirror) =>
+    mirror ? (360 - headingDeg) % 360 : headingDeg % 360;
+
 /// Rozkłada odchyłkę w układzie świata (north/east, metry) na układ CIAŁA
 /// obserwatora patrzącego w [headingDeg]: `forward` = do przodu (ujemne = za
 /// plecami), `right` = w prawo (ujemne = w lewo). Do prowadzenia tyczki:

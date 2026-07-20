@@ -91,6 +91,35 @@ void main() {
     expect(p, isNull);
   });
 
+  // LC29HEA nie wysyła GST — realną estymatę błędu daje $PQTMEPE (EPE_2D).
+  test('PQTMEPE ustawia dokładność dla kolejnej GGA', () {
+    final parser = NmeaParser();
+    // MsgVer=2, N=0.03, E=0.04, D=0.06, 2D=0.05, 3D=0.08
+    parser.addLine(_nmea('PQTMEPE,2,0.03,0.04,0.06,0.05,0.08'));
+    final p = parser.addLine(_nmea(
+        'GNGGA,120000.00,5000.000000,N,02000.000000,E,4,18,0.7,250.0,M,40,M,1.0,0000'));
+    expect(p!.accuracy, closeTo(0.05, 1e-6));
+  });
+
+  test('uszkodzone PQTMEPE nie psuje dokładności', () {
+    final parser = NmeaParser();
+    parser.addLine(_nmea('PQTMEPE,2,x,y,z')); // za krótkie / nie-liczby
+    final p = parser.addLine(_nmea(
+        'GNGGA,120000.00,5000.000000,N,02000.000000,E,4,18,1.0,250.0,M,40,M,1.0,0000'));
+    expect(p!.accuracy, lessThan(0.1)); // fallback: szacunek z fixa+HDOP
+  });
+
+  test('buildNmeaCommand dolicza sumę kontrolną i CRLF', () {
+    // Klasyczne zdanie o znanej sumie *47.
+    expect(
+      buildNmeaCommand(
+          'GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,'),
+      '\$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47\r\n',
+    );
+    expect(enableEpeCommand, startsWith(r'$PQTMCFGMSGRATE,W,PQTMEPE,1,2*'));
+    expect(enableEpeCommand, endsWith('\r\n'));
+  });
+
   test('śmieci i niepełne zdania nie wywracają parsera', () {
     final parser = NmeaParser();
     expect(parser.addLine(''), isNull);

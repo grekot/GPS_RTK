@@ -14,6 +14,30 @@ abstract class PositionSource {
   Stream<RtkPosition> positions();
 }
 
+/// Wgląd w przepływ poprawek NTRIP źródła — do wskaźnika wieku RTCM w UI.
+/// Liczony po stronie aplikacji (moment odebrania z castera), więc działa dla
+/// każdego transportu — telemetria BLE (`DeviceTelemetry`) mierzy to samo po
+/// stronie urządzenia i jest dokładniejsza, gdy dostępna.
+abstract class NtripFlowInfo {
+  /// Czy klient NTRIP tego źródła aktualnie działa.
+  bool get ntripActive;
+
+  /// Moment odebrania ostatniej porcji RTCM z castera (null = jeszcze nic).
+  DateTime? get lastRtcmAt;
+}
+
+/// Wiek ostatnich poprawek RTCM źródła [s]. Null, gdy źródło nie używa NTRIP,
+/// klient nie działa albo nic jeszcze nie przyszło (start połączenia).
+int? rtcmAgeSecondsOf(PositionSource source) {
+  if (source is! NtripFlowInfo) return null;
+  // Jawny cast: NtripFlowInfo nie jest podtypem PositionSource, więc `is`
+  // nie promuje typu.
+  final info = source as NtripFlowInfo;
+  if (!info.ntripActive) return null;
+  final t = info.lastRtcmAt;
+  return t == null ? null : DateTime.now().difference(t).inSeconds;
+}
+
 /// Baza źródeł sprzętowych (BLE/USB/COM): **jedno fizyczne połączenie
 /// współdzielone przez wszystkich słuchaczy**. Ekran główny i ekrany
 /// tyczenia/powierzchni subskrybują ten sam strumień broadcast — [connect]

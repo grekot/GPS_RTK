@@ -2196,6 +2196,9 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = position;
     final stale = staleSeconds != null;
+    // Wiek poprawek liczony w aplikacji — gdy jest telemetria BLE, jej pomiar
+    // (po stronie urządzenia) jest dokładniejszy i ten wiersz chowamy.
+    final rtcmAge = telemetry == null ? rtcmAgeSecondsOf(source) : null;
     return Card(
       elevation: 4,
       child: Padding(
@@ -2263,7 +2266,29 @@ class _StatusCard extends StatelessWidget {
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+              if (!stale &&
+                  p.fixType == FixType.rtkFixed &&
+                  p.accuracy > suspectFixedAccuracyMeters)
+                Text(
+                  'Fix podejrzany: odbiornik szacuje błąd '
+                  '±${p.accuracy.toStringAsFixed(2)} m mimo „RTK Fixed" — '
+                  'odsuń się od przeszkód i zmierz ponownie.',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
             ],
+            if (rtcmAge != null && error == null)
+              Text(
+                'Poprawki RTCM: $rtcmAge s temu'
+                '${rtcmAge > rtcmAgeBadSeconds ? ' — pozycja może dryfować mimo Fixed!' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: rtcmAge > rtcmAgeBadSeconds
+                          ? Theme.of(context).colorScheme.error
+                          : rtcmAge > rtcmAgeWarnSeconds
+                              ? Colors.orange.shade800
+                              : Colors.green.shade700,
+                    ),
+              ),
             if (telemetry != null && error == null) ...[
               const SizedBox(height: 6),
               _TelemetryRow(telemetry: telemetry!),

@@ -23,9 +23,16 @@ class _FixedSource implements PositionSource {
   Stream<RtkPosition> positions() => Stream.value(pos);
 }
 
-/// Sztuczne źródło sterowane z testu — pozycje wpuszcza się przez [ctrl].
-class _StreamSource implements PositionSource {
+/// Sztuczne źródło sterowane z testu — pozycje wpuszcza się przez [ctrl];
+/// implementuje też [NtripFlowInfo] (wiek poprawek RTCM ustawiany z testu).
+class _StreamSource implements PositionSource, NtripFlowInfo {
   final ctrl = StreamController<RtkPosition>.broadcast();
+
+  @override
+  bool ntripActive = false;
+
+  @override
+  DateTime? lastRtcmAt;
 
   @override
   String get name => 'test';
@@ -34,10 +41,10 @@ class _StreamSource implements PositionSource {
   Stream<RtkPosition> positions() => ctrl.stream;
 }
 
-RtkPosition _rtkFixed(LatLng at) => RtkPosition(
+RtkPosition _rtkFixed(LatLng at, {double accuracy = 0.02}) => RtkPosition(
       latitude: at.latitude,
       longitude: at.longitude,
-      accuracy: 0.02,
+      accuracy: accuracy,
       fixType: FixType.rtkFixed,
       timestamp: DateTime.utc(2026, 7, 4),
     );
@@ -120,5 +127,97 @@ void main() {
     expect(find.textContaining('RTK Fixed'), findsOneWidget);
 
     await src.ctrl.close();
+  });
+
+  // Wskaźnik wieku poprawek RTCM: świeże — zielona informacja bez alarmu;
+  // stare (>30 s) — ostrzeżenie, że odbiornik trzyma „Fixed" na przewidywanych
+  // poprawkach i pozycja może dryfować.
+  testWidgets('wiek poprawek: stare RTCM → ostrzeżenie o dryfie',
+      (tester) async {
+    const target = LatLng(50.0, 20.0);
+    final src = _StreamSource()
+      ..ntripActive = true
+      ..lastRtcmAt = DateTime.now();
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    src.ctrl.add(_rtkFixed(destinationLatLng(target, -1.0, 0)));
+    await tester.pump();
+    await tester.pump();
+
+    // Świeże poprawki: wiersz jest, alarmu nie ma.
+    expect(find.textContaining('Poprawki:'), findsOneWidget);
+    expect(find.textContaining('może dryfować'), findsNothing);
+
+    // Poprawki się zestarzały (45 s) — kolejna pozycja odświeża panel.
+    src.lastRtcmAt = DateTime.now().subtract(const Duration(seconds: 45));
+    src.ctrl.add(_rtkFixed(destinationLatLng(target, -1.5, 0)));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('może dryfować'), findsOneWidget);
+
+    await src.ctrl.close();
+  });
+
+  // Pełnoekranowa tarcza do precyzyjnego tyczenia: wejście ikoną w panelu,
+  // wyjście przyciskiem zamknięcia — te same dane, bez drugiej subskrypcji.
+  testWidgets('pełnoekranowa tarcza: otwarcie i zamknięcie', (tester) async {
+    const target = LatLng(50.0, 20.0);
+    final src = _FixedSource(_rtkFixed(destinationLatLng(target, -1.0, 0)));
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('tyczenie precyzyjne'), findsNothing);
+
+    await tester.tap(find.byTooltip('Tarcza na pełnym ekranie'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('tyczenie precyzyjne'), findsOneWidget);
+    // Panel w pełnym ekranie nadal pokazuje odczyty; zwykły panel wciąż jest
+    // w drzewie POD nakładką, więc „RTK Fixed" występuje 2× (overlay + panel).
+    expect(find.textContaining('RTK Fixed'), findsNWidgets(2));
+
+    await tester.tap(find.byIcon(Icons.fullscreen_exit));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('tyczenie precyzyjne'), findsNothing);
+  });
+
+  // Fałszywy fix: odbiornik raportuje „RTK Fixed", ale jego własna estymata
+  // błędu (PQTMEPE) jest duża — panel musi to wykrzyczeć, bo pozycja bywa
+  // przesunięta o dm-m mimo zielonego fixa.
+  testWidgets('Fixed z dużym szacowanym błędem → „Fix podejrzany"',
+      (tester) async {
+    const target = LatLng(50.0, 20.0);
+    final src = _FixedSource(RtkPosition(
+      latitude: destinationLatLng(target, -1.0, 0).latitude,
+      longitude: destinationLatLng(target, -1.0, 0).longitude,
+      accuracy: 0.5, // EPE 0,5 m przy „Fixed" = podejrzane
+      fixType: FixType.rtkFixed,
+      timestamp: DateTime.utc(2026, 7, 4),
+    ));
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Fix podejrzany'), findsOneWidget);
   });
 }

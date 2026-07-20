@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show ascii;
 import 'dart:typed_data';
 
 import 'package:flutter_libserialport/flutter_libserialport.dart';
@@ -18,7 +19,8 @@ import 'position_source.dart';
 /// Przepływ jak w BLE/USB: bajty z portu → linie NMEA → [RtkPosition];
 /// RTCM z castera NTRIP → zapis do portu; GGA odsyłane do castera (VRS).
 /// Brak telemetrii (`DeviceTelemetry`) — to rozszerzenie BLE; status z NMEA.
-class SerialReceiverSource extends SharedPositionSource {
+class SerialReceiverSource extends SharedPositionSource
+    implements NtripFlowInfo {
   @override
   String get name => 'Odbiornik RTK (COM)';
 
@@ -40,6 +42,13 @@ class SerialReceiverSource extends SharedPositionSource {
   Timer? _ggaTimer;
   RtkPosition? _last;
   StreamSubscription<Uint8List>? _readerSub;
+  DateTime? _lastRtcmAt;
+
+  @override
+  bool get ntripActive => _ntrip != null;
+
+  @override
+  DateTime? get lastRtcmAt => _lastRtcmAt;
 
   /// Dostępne porty z opisem (do wyboru w UI). Bezpieczne — nie otwiera portu.
   static List<({String name, String? description})> portsWithInfo() {
@@ -102,6 +111,12 @@ class SerialReceiverSource extends SharedPositionSource {
         },
       );
       _status.add('Połączono ($chosen, ${AppSettings.instance.usbBaud} bps)');
+      // Włącz raport estymaty błędu pozycji (PQTMEPE @1 Hz) — realna
+      // dokładność zamiast szacunku z HDOP; niekrytyczne, gdy się nie uda.
+      try {
+        port.write(Uint8List.fromList(ascii.encode(enableEpeCommand)),
+            timeout: 1000);
+      } catch (_) {}
       _maybeStartNtrip();
     } catch (e) {
       if (!ctrl.isClosed) ctrl.addError(e);
@@ -160,6 +175,7 @@ class SerialReceiverSource extends SharedPositionSource {
   }
 
   Future<void> _writeRtcm(List<int> rtcm) async {
+    _lastRtcmAt = DateTime.now();
     final port = _port;
     if (port == null) return;
     try {
@@ -173,6 +189,7 @@ class SerialReceiverSource extends SharedPositionSource {
     _ggaTimer = null;
     await _ntrip?.stop();
     _ntrip = null;
+    _lastRtcmAt = null;
     await _readerSub?.cancel();
     _readerSub = null;
     try {

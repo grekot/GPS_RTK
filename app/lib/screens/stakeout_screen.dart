@@ -94,6 +94,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   String? _error;
   int _targetIndex = 0;
   bool _followPosition = false;
+  bool _fullDial = false; // tarcza na pełnym ekranie (precyzyjne tyczenie)
   int _lastZone = 0; // 0 = daleko ... 3 = przy punkcie
 
   final _measureStore = MeasuredPointStore();
@@ -155,8 +156,12 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
     if (compass != null) {
       _compassSub = compass.listen(
         (e) {
-          final h = e.heading;
-          if (h == null || !mounted) return;
+          final raw = e.heading;
+          if (raw == null || !mounted) return;
+          // Korekta lustrzana (ustawienia) — niektóre telefony zwracają kurs
+          // odbity: E/W zamienione, róża kręci się w złą stronę.
+          final h =
+              applyCompassMirror(raw, AppSettings.instance.compassMirror);
           // Aktualizuj dopiero przy zauważalnej zmianie — mniej przerysowań.
           if (_deviceHeading == null ||
               (h - _deviceHeading!).abs() > 1.5) {
@@ -432,7 +437,13 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   Widget build(BuildContext context) {
     final p = _position;
     final current = p == null ? null : LatLng(p.latitude, p.longitude);
-    return Scaffold(
+    // Przycisk „wstecz" najpierw zamyka pełnoekranową tarczę, nie cały ekran.
+    return PopScope(
+      canPop: !_fullDial,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _fullDial) setState(() => _fullDial = false);
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
@@ -609,6 +620,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                     heading: _effectiveHeading,
                     compassAlive: _deviceHeading != null,
                     staleSeconds: _staleSeconds,
+                    rtcmAgeSeconds: rtcmAgeSecondsOf(widget.source),
                     error: _error,
                     target: _target,
                     label: _targetLabel,
@@ -616,12 +628,119 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                     targetCount: _vertices.length,
                     onPrevious: () => _selectTarget(_targetIndex - 1),
                     onNext: () => _selectTarget(_targetIndex + 1),
+                    onExpand: () => setState(() => _fullDial = true),
                   ),
                 ),
               ],
             ),
           ),
+          // Pełnoekranowa tarcza do precyzyjnego tyczenia — na wierzchu Stacka,
+          // ten sam stan/strumień pozycji, żadnych dodatkowych subskrypcji.
+          if (_fullDial) Positioned.fill(child: _buildFullDial(context, p)),
         ],
+      ),
+      ),
+    );
+  }
+
+  /// Pełnoekranowy widok tarczy: duży wskaźnik + te same odczyty co w panelu
+  /// (bez małej tarczy), przycisk „Zmierz" i diagnostyczny odczyt kompasu
+  /// w stopniach (pozwala w terenie zweryfikować kierunki i ewentualnie
+  /// włączyć w ustawieniach odbicie lustrzane).
+  Widget _buildFullDial(BuildContext context, RtkPosition? p) {
+    final theme = Theme.of(context);
+    Widget dial;
+    if (p == null) {
+      dial = const Center(child: Text('Oczekiwanie na pozycję…'));
+    } else {
+      final current = LatLng(p.latitude, p.longitude);
+      final distance = distanceMeters(current, _target);
+      final arrived = distance <= _arrivedThreshold;
+      dial = LayoutBuilder(builder: (context, c) {
+        final side = min(c.maxWidth, c.maxHeight) - 24;
+        return Center(
+          child: _GuidanceIndicator(
+            size: max(side, 132),
+            distance: distance,
+            bearing: bearingDegrees(current, _target),
+            heading: _effectiveHeading,
+            color:
+                arrived ? Colors.green.shade600 : theme.colorScheme.primary,
+            gridColor: theme.dividerColor,
+            textColor: theme.textTheme.bodySmall!.color!,
+          ),
+        );
+      });
+    }
+    return ColoredBox(
+      color: theme.scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Punkt $_targetLabel — tyczenie precyzyjne',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Zamknij pełny ekran',
+                  onPressed: () => setState(() => _fullDial = false),
+                  icon: const Icon(Icons.fullscreen_exit),
+                ),
+              ],
+            ),
+            if (_averager != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: MeasuringBanner(
+                  count: _averager!.count,
+                  targetSamples: _averager!.targetSamples,
+                  rms: _averager!.currentRms(),
+                  onSave: () => _finishMeasure(save: true),
+                  onCancel: _cancelMeasure,
+                ),
+              ),
+            Expanded(child: dial),
+            if (_deviceHeading != null)
+              Text(
+                'Kompas: ${_deviceHeading!.round()}° '
+                '(${cardinal(_deviceHeading!)})',
+                style: theme.textTheme.bodySmall,
+              ),
+            if (_averager == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                child: FloatingActionButton.extended(
+                  heroTag: 'stakeMeasureFull',
+                  onPressed: _startMeasure,
+                  icon: const Icon(Icons.add_location_alt),
+                  label: const Text('Zmierz'),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _StakeoutPanel(
+                position: p,
+                heading: _effectiveHeading,
+                compassAlive: _deviceHeading != null,
+                staleSeconds: _staleSeconds,
+                rtcmAgeSeconds: rtcmAgeSecondsOf(widget.source),
+                error: _error,
+                target: _target,
+                label: _targetLabel,
+                bpp: _targetBpp,
+                targetCount: _vertices.length,
+                onPrevious: () => _selectTarget(_targetIndex - 1),
+                onNext: () => _selectTarget(_targetIndex + 1),
+                showDial: false,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -661,6 +780,7 @@ class _StakeoutPanel extends StatelessWidget {
     required this.heading,
     required this.compassAlive,
     required this.staleSeconds,
+    required this.rtcmAgeSeconds,
     required this.error,
     required this.target,
     required this.label,
@@ -668,6 +788,8 @@ class _StakeoutPanel extends StatelessWidget {
     required this.targetCount,
     required this.onPrevious,
     required this.onNext,
+    this.onExpand,
+    this.showDial = true,
   });
 
   final RtkPosition? position;
@@ -680,6 +802,10 @@ class _StakeoutPanel extends StatelessWidget {
   /// Sekundy od ostatniej pozycji, gdy strumień „zamarł" (null = dane świeże).
   /// Wskazówki tyczenia liczą się wtedy z nieaktualnej pozycji.
   final int? staleSeconds;
+
+  /// Wiek ostatnich poprawek RTCM z castera [s]; null = NTRIP nie działa.
+  /// Rosnący wiek przy „Fixed" = odbiornik trzyma fix na starych poprawkach.
+  final int? rtcmAgeSeconds;
   final String? error;
   final LatLng target;
   final String label;
@@ -687,6 +813,14 @@ class _StakeoutPanel extends StatelessWidget {
   final int targetCount;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+
+  /// Otwiera pełnoekranową tarczę (null = przycisk ukryty, np. gdy panel
+  /// jest częścią widoku pełnoekranowego).
+  final VoidCallback? onExpand;
+
+  /// Czy rysować małą tarczę w panelu (false w widoku pełnoekranowym —
+  /// tam dużą tarczę rysuje sam ekran).
+  final bool showDial;
 
   static String _fixLabel(FixType f) => switch (f) {
         FixType.rtkFixed => 'RTK Fixed',
@@ -731,15 +865,20 @@ class _StakeoutPanel extends StatelessWidget {
       content = Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _GuidanceIndicator(
-            distance: distance,
-            bearing: bearing,
-            heading: heading,
-            color: accentColor,
-            gridColor: theme.dividerColor,
-            textColor: theme.textTheme.bodySmall!.color!,
-          ),
-          const SizedBox(width: 14),
+          if (showDial) ...[
+            GestureDetector(
+              onTap: onExpand, // tap w tarczę = pełny ekran
+              child: _GuidanceIndicator(
+                distance: distance,
+                bearing: bearing,
+                heading: heading,
+                color: accentColor,
+                gridColor: theme.dividerColor,
+                textColor: theme.textTheme.bodySmall!.color!,
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -796,6 +935,35 @@ class _StakeoutPanel extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                if (rtcmAgeSeconds != null)
+                  Builder(builder: (context) {
+                    final age = rtcmAgeSeconds!;
+                    final bad = age > rtcmAgeBadSeconds;
+                    return Text(
+                      'Poprawki: $age s temu'
+                      '${bad ? ' — pozycja może dryfować mimo Fixed!' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: bad
+                            ? theme.colorScheme.error
+                            : age > rtcmAgeWarnSeconds
+                                ? Colors.orange.shade800
+                                : Colors.green.shade700,
+                        fontWeight: bad ? FontWeight.w600 : null,
+                      ),
+                    );
+                  }),
+                if (staleSeconds == null &&
+                    p.fixType == FixType.rtkFixed &&
+                    p.accuracy > suspectFixedAccuracyMeters)
+                  Text(
+                    'Fix podejrzany (szacowany błąd '
+                    '±${p.accuracy.toStringAsFixed(2)} m) — odsuń się od '
+                    'przeszkód i zmierz punkt ponownie.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -829,6 +997,12 @@ class _StakeoutPanel extends StatelessWidget {
                   onPressed: onNext,
                   icon: const Icon(Icons.chevron_right),
                 ),
+                if (onExpand != null)
+                  IconButton(
+                    tooltip: 'Tarcza na pełnym ekranie',
+                    onPressed: onExpand,
+                    icon: const Icon(Icons.fullscreen),
+                  ),
               ],
             ),
             if (bpp != null)
@@ -861,6 +1035,7 @@ class _GuidanceIndicator extends StatelessWidget {
     required this.color,
     required this.gridColor,
     required this.textColor,
+    this.size = 132,
   });
 
   final double distance;
@@ -870,7 +1045,9 @@ class _GuidanceIndicator extends StatelessWidget {
   final Color gridColor;
   final Color textColor;
 
-  static const double _size = 132;
+  /// Bok wskaźnika [px]. 132 w panelu; pełny ekran podaje rozmiar ekranu —
+  /// painter skaluje wtedy czcionki/grubości proporcjonalnie.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -882,10 +1059,10 @@ class _GuidanceIndicator extends StatelessWidget {
     final Widget core = isArrow
         ? Transform.rotate(
             angle: angleRad,
-            child: Icon(Icons.navigation, size: 96, color: color),
+            child: Icon(Icons.navigation, size: size * 96 / 132, color: color),
           )
         : CustomPaint(
-            size: const Size.square(_size),
+            size: Size.square(size),
             painter: _BullseyePainter(
               distance: distance,
               angleRad: angleRad,
@@ -893,12 +1070,13 @@ class _GuidanceIndicator extends StatelessWidget {
               color: color,
               gridColor: gridColor,
               textColor: textColor,
+              scale: size / 132,
             ),
           );
 
     return SizedBox(
-      width: _size,
-      height: _size,
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -931,6 +1109,7 @@ class _BullseyePainter extends CustomPainter {
     required this.color,
     required this.gridColor,
     required this.textColor,
+    this.scale = 1,
   });
 
   final double distance;
@@ -940,31 +1119,36 @@ class _BullseyePainter extends CustomPainter {
   final Color gridColor;
   final Color textColor;
 
+  /// Współczynnik powiększenia (1 = tarcza 132 px w panelu). Skaluje czcionki,
+  /// grubości kresek i marker celu — geometria pierścieni skaluje się sama.
+  final double scale;
+
   static const _rings = [0.2, 0.5, 1.0, 2.0, 3.0]; // metry
 
   @override
   void paint(Canvas canvas, Size size) {
+    final s = scale;
     final center = Offset(size.width / 2, size.height / 2);
-    final maxR = size.shortestSide / 2 - 12;
-    final scale = maxR / _rings.last;
+    final maxR = size.shortestSide / 2 - 12 * s;
+    final mScale = maxR / _rings.last; // metry → piksele
     final ringPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
+      ..strokeWidth = 1 * s
       ..color = gridColor;
 
     for (final r in _rings) {
-      canvas.drawCircle(center, r * scale, ringPaint);
+      canvas.drawCircle(center, r * mScale, ringPaint);
       final label = r < 1 ? '${(r * 100).round()} cm' : '${r.toInt()} m';
       final tp = TextPainter(
         text: TextSpan(
           text: label,
-          style: TextStyle(color: textColor, fontSize: 9),
+          style: TextStyle(color: textColor, fontSize: 9 * s),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
       // Etykiety pierścieni na skosie (45° w prawo-górę), by nie kolidowały
       // z obracaną różą kierunków (litery N/E/S/W).
-      final lr = r * scale * 0.7071;
+      final lr = r * mScale * 0.7071;
       tp.paint(canvas, center + Offset(lr - tp.width / 2, -lr - tp.height / 2));
     }
 
@@ -974,23 +1158,23 @@ class _BullseyePainter extends CustomPainter {
     final rot = headingRad ?? 0;
     final tickPaint = Paint()
       ..color = gridColor
-      ..strokeWidth = 1.5;
+      ..strokeWidth = 1.5 * s;
     for (var k = 0; k < 8; k++) {
       final a = k * pi / 4 - rot; // azymut świata → kąt na ekranie
       final dir = Offset(sin(a), -cos(a));
       canvas.drawLine(
-          center + dir * (maxR - 4), center + dir * maxR, tickPaint);
+          center + dir * (maxR - 4 * s), center + dir * maxR, tickPaint);
     }
     const letters = [('N', 0.0), ('E', 90.0), ('S', 180.0), ('W', 270.0)];
     for (final (txt, azDeg) in letters) {
       final a = azDeg * pi / 180 - rot;
-      final pos = center + Offset(sin(a), -cos(a)) * (maxR + 7);
+      final pos = center + Offset(sin(a), -cos(a)) * (maxR + 7 * s);
       final tp = TextPainter(
         text: TextSpan(
           text: txt,
           style: TextStyle(
             color: txt == 'N' ? color : textColor,
-            fontSize: 10,
+            fontSize: 10 * s,
             fontWeight: txt == 'N' ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -1003,9 +1187,9 @@ class _BullseyePainter extends CustomPainter {
     if (headingRad != null) {
       // ui.Path — bo latlong2 też eksportuje typ „Path" (kolizja nazw).
       final wedge = ui.Path()
-        ..moveTo(center.dx, center.dy - maxR + 2)
-        ..lineTo(center.dx - 5, center.dy - maxR - 8)
-        ..lineTo(center.dx + 5, center.dy - maxR - 8)
+        ..moveTo(center.dx, center.dy - maxR + 2 * s)
+        ..lineTo(center.dx - 5 * s, center.dy - maxR - 8 * s)
+        ..lineTo(center.dx + 5 * s, center.dy - maxR - 8 * s)
         ..close();
       canvas.drawPath(wedge, Paint()..color = color);
     }
@@ -1013,28 +1197,28 @@ class _BullseyePainter extends CustomPainter {
     // Środek = Twoja pozycja (krzyżyk).
     final cross = Paint()
       ..color = textColor
-      ..strokeWidth = 1.5;
-    canvas.drawLine(center + const Offset(-6, 0), center + const Offset(6, 0), cross);
-    canvas.drawLine(center + const Offset(0, -6), center + const Offset(0, 6), cross);
+      ..strokeWidth = 1.5 * s;
+    canvas.drawLine(center + Offset(-6 * s, 0), center + Offset(6 * s, 0), cross);
+    canvas.drawLine(center + Offset(0, -6 * s), center + Offset(0, 6 * s), cross);
 
     // Cel jako punkt; idź tak, by sprowadzić go do środka.
-    final r = distance.clamp(0.0, _rings.last) * scale;
+    final r = distance.clamp(0.0, _rings.last) * mScale;
     final dot = center + Offset(sin(angleRad) * r, -cos(angleRad) * r);
     canvas.drawLine(
       center,
       dot,
       Paint()
         ..color = color
-        ..strokeWidth = 2,
+        ..strokeWidth = 2 * s,
     );
-    canvas.drawCircle(dot, 8, Paint()..color = color);
+    canvas.drawCircle(dot, 8 * s, Paint()..color = color);
     canvas.drawCircle(
       dot,
-      8,
+      8 * s,
       Paint()
         ..style = PaintingStyle.stroke
         ..color = Colors.white
-        ..strokeWidth = 2,
+        ..strokeWidth = 2 * s,
     );
   }
 
@@ -1043,5 +1227,6 @@ class _BullseyePainter extends CustomPainter {
       old.distance != distance ||
       old.angleRad != angleRad ||
       old.headingRad != headingRad ||
+      old.scale != scale ||
       old.color != color;
 }

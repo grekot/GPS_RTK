@@ -20,6 +20,7 @@ void main() {
       keepAwake: false,
       ggaSeconds: 5,
       usbBaud: 460800,
+      compassMirror: true,
     ).save();
     await AppSettings.load();
     final s = AppSettings.instance;
@@ -28,6 +29,16 @@ void main() {
     expect(s.keepAwake, isFalse);
     expect(s.ggaSeconds, 5);
     expect(s.usbBaud, 460800);
+    expect(s.compassMirror, isTrue);
+  });
+
+  test('compassMirror: domyślnie wyłączony (stare zapisy bez pola)', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.v1': '{"samples":25,"requireFixed":false,'
+          '"keepAwake":true,"ggaSeconds":10,"usbBaud":460800}',
+    });
+    await AppSettings.load();
+    expect(AppSettings.instance.compassMirror, isFalse);
   });
 
   test('brak zapisanych ustawień → wartości domyślne', () async {

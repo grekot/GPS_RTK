@@ -32,6 +32,19 @@ String fixLabel(FixType f) => switch (f) {
 /// Odbiornik nadaje 1–10 Hz, więc 5 s to bezpieczny margines.
 const int positionStaleSeconds = 5;
 
+/// Progi wieku ostatnich poprawek RTCM [s] dla wskaźnika w UI: do
+/// [rtcmAgeWarnSeconds] zielono (płyną na bieżąco), potem pomarańczowo,
+/// powyżej [rtcmAgeBadSeconds] czerwono — odbiornik trzyma wtedy „Fixed" na
+/// przewidywanych poprawkach i pozycja może dryfować mimo zielonego fixa.
+const int rtcmAgeWarnSeconds = 10;
+const int rtcmAgeBadSeconds = 30;
+
+/// Szacowany błąd [m], powyżej którego „RTK Fixed" traktujemy jako podejrzany
+/// (fałszywy fix — złe rozwiązanie nieoznaczoności, typowo przy odbiciach).
+/// Prawdziwy Fixed ma 2–5 cm; szacunek z HDOP nie przekracza 0,10 m, więc
+/// ostrzeżenie odpala tylko realna estymata odbiornika (PQTMEPE/GST).
+const double suspectFixedAccuracyMeters = 0.10;
+
 /// Pozycja niezależna od źródła (GPS telefonu / odbiornik RTK po BLE).
 class RtkPosition {
   final double latitude;

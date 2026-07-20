@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show ascii;
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 
@@ -24,7 +25,7 @@ import 'position_source.dart';
 ///
 /// **Tylko Android.** Na iOS/desktopie [positions] od razu zgłasza błąd —
 /// `usb_serial` ma natywną część wyłącznie dla Androida.
-class UsbReceiverSource extends SharedPositionSource {
+class UsbReceiverSource extends SharedPositionSource implements NtripFlowInfo {
   @override
   String get name => 'Odbiornik RTK (USB)';
 
@@ -41,6 +42,13 @@ class UsbReceiverSource extends SharedPositionSource {
   Timer? _ggaTimer;
   RtkPosition? _last;
   StreamSubscription<Uint8List>? _portSub;
+  DateTime? _lastRtcmAt;
+
+  @override
+  bool get ntripActive => _ntrip != null;
+
+  @override
+  DateTime? get lastRtcmAt => _lastRtcmAt;
 
   @override
   Future<void> connect(StreamController<RtkPosition> ctrl, int epoch) async {
@@ -95,6 +103,11 @@ class UsbReceiverSource extends SharedPositionSource {
       final label = device.productName ?? device.manufacturerName ?? 'USB';
       _status.add('Połączono z odbiornikiem ($label, '
           '${AppSettings.instance.usbBaud} bps)');
+      // Włącz raport estymaty błędu pozycji (PQTMEPE @1 Hz) — realna
+      // dokładność zamiast szacunku z HDOP; niekrytyczne, gdy się nie uda.
+      try {
+        await port.write(Uint8List.fromList(ascii.encode(enableEpeCommand)));
+      } catch (_) {}
       _maybeStartNtrip();
     } catch (e) {
       if (!ctrl.isClosed) ctrl.addError(e);
@@ -154,6 +167,7 @@ class UsbReceiverSource extends SharedPositionSource {
 
   // USB uciągnie całość strumienia RTCM bez ograniczenia MTU (inaczej niż BLE).
   Future<void> _writeRtcm(List<int> rtcm) async {
+    _lastRtcmAt = DateTime.now();
     final port = _port;
     if (port == null) return;
     try {
@@ -167,6 +181,7 @@ class UsbReceiverSource extends SharedPositionSource {
     _ggaTimer = null;
     await _ntrip?.stop();
     _ntrip = null;
+    _lastRtcmAt = null;
     await _portSub?.cancel();
     _portSub = null;
     try {
