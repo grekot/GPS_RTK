@@ -123,6 +123,15 @@ bool isValidLatLng(double lat, double lon) =>
     lat.abs() <= 90 &&
     lon.abs() <= 180;
 
+/// Interpolacja kątów [°] po najkrótszej drodze (przez 0/360). Do wygładzania
+/// odczytu kompasu (filtr dolnoprzepustowy) — bez tego róża tarczy drga przy
+/// każdym szumie magnetometru. Dla kątów odległych dokładnie o 180° kierunek
+/// interpolacji jest umowny.
+double lerpAngleDeg(double a, double b, double t) {
+  final d = ((b - a + 540) % 360) - 180; // różnica w zakresie (-180, 180]
+  return (a + d * t + 360) % 360;
+}
+
 /// Lustrzana korekta odczytu kompasu: heading → (360 − heading) % 360.
 /// Niektóre telefony/orientacje zwracają kurs odbity (E i W zamienione,
 /// obrót róży w złą stronę) — przełącznik w ustawieniach to prostuje.

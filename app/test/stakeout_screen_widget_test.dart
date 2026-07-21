@@ -194,6 +194,81 @@ void main() {
     expect(find.textContaining('tyczenie precyzyjne'), findsNothing);
   });
 
+  // Kurs z RUCHU: bez kompasu i bez kursu z odbiornika strzałka marszu ma
+  // prowadzić według kierunku liczonego z kolejnych pozycji RTK — feedback
+  // z terenu: kompas przy poziomym montażu kłamał i strzałka pokazywała
+  // w inną stronę niż trzeba iść.
+  testWidgets('kurs z ruchu: marsz na wschód, cel na północy → „w lewo"',
+      (tester) async {
+    AppSettings.instance = AppSettings();
+    const target = LatLng(50.0, 20.0);
+    final src = _StreamSource();
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    // Start 10 m na południe od celu; bez ruchu wskazówka tylko „światowa".
+    final p1 = destinationLatLng(target, -10.0, 0);
+    src.ctrl.add(_rtkFixed(p1));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('kierunek N'), findsOneWidget);
+
+    // Krok 1 m NA WSCHÓD → kurs z ruchu 90°; cel na północy = po LEWEJ.
+    src.ctrl.add(_rtkFixed(destinationLatLng(p1, 0, 1.0)));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('w lewo'), findsOneWidget);
+
+    await src.ctrl.close();
+  });
+
+  // Tryb „Północ u góry": przełącznik na pełnym ekranie ustawia stały układ
+  // tarczy (zapamiętywany w ustawieniach), a panel przestaje pokazywać
+  // wskazówki w układzie ciała (kompas celowo ignorowany).
+  testWidgets('pełny ekran: przełącznik „Północ u góry" działa i zapisuje się',
+      (tester) async {
+    AppSettings.instance = AppSettings(); // czysty stan (statyczny singleton)
+    const target = LatLng(50.0, 20.0);
+    final src = _FixedSource(RtkPosition(
+      latitude: destinationLatLng(target, -1.0, 0).latitude,
+      longitude: destinationLatLng(target, -1.0, 0).longitude,
+      accuracy: 0.02,
+      fixType: FixType.rtkFixed,
+      timestamp: DateTime.utc(2026, 7, 4),
+      heading: 90, // kurs z GPS — w trybie kompasu daje wskazówki „w lewo"
+    ));
+
+    await tester.pumpWidget(MaterialApp(
+      home: StakeoutScreen(
+        targets: const [target],
+        title: 'Test',
+        projectId: 'p1',
+        source: src,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Tarcza na pełnym ekranie'));
+    await tester.pumpAndSettle();
+
+    // Tryb kompasu (domyślny): panel pokazuje odchyłkę w układzie ciała.
+    expect(find.textContaining('← w lewo'), findsWidgets);
+
+    await tester.tap(find.text('Północ u góry'));
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.dialNorthUp, isTrue);
+    // Układ świata: znikają wskazówki ciała, jest dopisek trybu.
+    expect(find.textContaining('← w lewo'), findsNothing);
+    expect(find.textContaining('północ u góry'), findsWidgets);
+    // Duża komenda przesunięcia w N/E jest na ekranie.
+    expect(find.textContaining('Przesuń: N'), findsOneWidget);
+  });
+
   // Fałszywy fix: odbiornik raportuje „RTK Fixed", ale jego własna estymata
   // błędu (PQTMEPE) jest duża — panel musi to wykrzyczeć, bo pozycja bywa
   // przesunięta o dm-m mimo zielonego fixa.

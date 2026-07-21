@@ -32,13 +32,22 @@ void main() {
     expect(s.compassMirror, isTrue);
   });
 
-  test('compassMirror: domyślnie wyłączony (stare zapisy bez pola)', () async {
+  test('compassMirror i dialNorthUp: domyślnie wyłączone (stare zapisy)',
+      () async {
     SharedPreferences.setMockInitialValues({
       'settings.v1': '{"samples":25,"requireFixed":false,'
           '"keepAwake":true,"ggaSeconds":10,"usbBaud":460800}',
     });
     await AppSettings.load();
     expect(AppSettings.instance.compassMirror, isFalse);
+    expect(AppSettings.instance.dialNorthUp, isFalse);
+  });
+
+  test('dialNorthUp: round-trip save/load', () async {
+    SharedPreferences.setMockInitialValues({});
+    await AppSettings(dialNorthUp: true).save();
+    await AppSettings.load();
+    expect(AppSettings.instance.dialNorthUp, isTrue);
   });
 
   test('brak zapisanych ustawień → wartości domyślne', () async {

@@ -91,6 +91,15 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   Timer? _staleTimer;
   int _staleTicks = 0;
   double? _deviceHeading; // kierunek z kompasu (magnetometru), stopnie 0–360
+  double? _headingSmoothed; // wewnętrzny stan filtra (przed progiem odświeżeń)
+
+  // Kurs z RUCHU: kierunek liczony z kolejnych pozycji RTK podczas marszu.
+  // Przy dokładności cm to najpewniejsze źródło kierunku (magnetometr przy
+  // poziomym montażu na tyczce kłamie) — strzałka marszu korzysta z niego
+  // w pierwszej kolejności. Świeży tylko w ruchu ([_motionTicks] ≤ 5 s).
+  LatLng? _courseFrom;
+  double? _motionCourse;
+  int _motionTicks = 999;
   String? _error;
   int _targetIndex = 0;
   bool _followPosition = false;
@@ -126,6 +135,13 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   /// na stojąco), w razie braku — kurs z GPS (tylko podczas ruchu).
   double? get _effectiveHeading => _deviceHeading ?? _position?.heading;
 
+  /// Tryb tarczy „północ u góry" (stały układ, nie kręci się z kompasem).
+  bool get _northUp => AppSettings.instance.dialNorthUp;
+
+  /// Kurs z ruchu, jeśli świeży (marsz w ciągu ostatnich 5 s) — inaczej null.
+  double? get _motionHeading =>
+      _motionCourse != null && _motionTicks <= 5 ? _motionCourse : null;
+
   /// Sekundy od ostatniej pozycji, gdy dane są już nieświeże (inaczej null).
   int? get _staleSeconds =>
       _position != null && _staleTicks >= positionStaleSeconds
@@ -147,6 +163,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
     );
     _staleTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _staleTicks++;
+      _motionTicks++; // starzenie kursu z ruchu (na stojąco wraca kompas)
       // Przerysowanie tylko gdy ostrzeżenie widoczne (aktualizacja licznika).
       if (_staleSeconds != null && mounted) setState(() {});
     });
@@ -162,10 +179,16 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
           // odbity: E/W zamienione, róża kręci się w złą stronę.
           final h =
               applyCompassMirror(raw, AppSettings.instance.compassMirror);
+          // Filtr dolnoprzepustowy (interpolacja po najkrótszej drodze) —
+          // surowy magnetometr drga i róża „tańczyła" przy tyczeniu.
+          final sm = _headingSmoothed == null
+              ? h
+              : lerpAngleDeg(_headingSmoothed!, h, 0.25);
+          _headingSmoothed = sm;
           // Aktualizuj dopiero przy zauważalnej zmianie — mniej przerysowań.
           if (_deviceHeading == null ||
-              (h - _deviceHeading!).abs() > 1.5) {
-            setState(() => _deviceHeading = h);
+              relativeBearing(sm, _deviceHeading!).abs() > 1.5) {
+            setState(() => _deviceHeading = sm);
           }
         },
         onError: (_) {},
@@ -181,6 +204,21 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
 
   void _onPosition(RtkPosition p) {
     _staleTicks = 0;
+    // Aktualizacja kursu z ruchu. Baza adaptacyjna do dokładności: przy RTK
+    // Fixed wystarczy pół metra marszu; przy słabym fixie dłuższy odcinek —
+    // inaczej szum pozycji udawałby ruch i kręcił strzałką.
+    final here = LatLng(p.latitude, p.longitude);
+    final from = _courseFrom;
+    if (from == null) {
+      _courseFrom = here;
+    } else {
+      final moved = distanceMeters(from, here);
+      if (moved >= max(0.5, 4 * p.accuracy)) {
+        _motionCourse = bearingDegrees(from, here);
+        _courseFrom = here;
+        _motionTicks = 0;
+      }
+    }
     setState(() {
       _position = p;
       _error = null;
@@ -618,6 +656,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                   child: _StakeoutPanel(
                     position: p,
                     heading: _effectiveHeading,
+                    motionHeading: _motionHeading,
                     compassAlive: _deviceHeading != null,
                     staleSeconds: _staleSeconds,
                     rtcmAgeSeconds: rtcmAgeSecondsOf(widget.source),
@@ -629,6 +668,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                     onPrevious: () => _selectTarget(_targetIndex - 1),
                     onNext: () => _selectTarget(_targetIndex + 1),
                     onExpand: () => setState(() => _fullDial = true),
+                    northUp: _northUp,
                   ),
                 ),
               ],
@@ -663,7 +703,13 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
             size: max(side, 132),
             distance: distance,
             bearing: bearingDegrees(current, _target),
-            heading: _effectiveHeading,
+            // Tryb „północ u góry": tarcza w stałym układzie świata — nie
+            // kręci się z kompasem, kropka celu stoi stabilnie.
+            heading: _northUp ? null : _effectiveHeading,
+            // Strzałka marszu: kurs z ruchu RTK ma pierwszeństwo (kompas
+            // przy poziomym montażu kłamie — feedback z terenu).
+            arrowHeading:
+                _motionHeading ?? (_northUp ? null : _effectiveHeading),
             color:
                 arrived ? Colors.green.shade600 : theme.colorScheme.primary,
             gridColor: theme.dividerColor,
@@ -704,7 +750,45 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                   onCancel: _cancelMeasure,
                 ),
               ),
+            // Tryb tarczy: kompas bywa niestabilny przy poziomym montażu
+            // (metal tyczki, kabel OTG) — „Północ u góry" daje stały układ.
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text('Wg kompasu'),
+                  icon: Icon(Icons.explore_outlined),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text('Północ u góry'),
+                  icon: Icon(Icons.north),
+                ),
+              ],
+              selected: {_northUp},
+              onSelectionChanged: (s) {
+                setState(() => AppSettings.instance.dialNorthUp = s.first);
+                unawaited(AppSettings.instance.save());
+              },
+            ),
             Expanded(child: dial),
+            if (p != null)
+              Builder(builder: (context) {
+                // Komenda przesunięcia tyczki w układzie świata — czytelna
+                // niezależnie od kompasu (kropka na tarczy pokazuje to samo).
+                final off =
+                    offsetNorthEast(LatLng(p.latitude, p.longitude), _target);
+                return Text(
+                  'Przesuń: ${off.north >= 0 ? 'N' : 'S'} '
+                  '${formatDistance(off.north.abs())} · '
+                  '${off.east >= 0 ? 'E' : 'W'} '
+                  '${formatDistance(off.east.abs())}',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                );
+              }),
             if (_deviceHeading != null)
               Text(
                 'Kompas: ${_deviceHeading!.round()}° '
@@ -726,6 +810,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
               child: _StakeoutPanel(
                 position: p,
                 heading: _effectiveHeading,
+                motionHeading: _motionHeading,
                 compassAlive: _deviceHeading != null,
                 staleSeconds: _staleSeconds,
                 rtcmAgeSeconds: rtcmAgeSecondsOf(widget.source),
@@ -737,6 +822,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                 onPrevious: () => _selectTarget(_targetIndex - 1),
                 onNext: () => _selectTarget(_targetIndex + 1),
                 showDial: false,
+                northUp: _northUp,
               ),
             ),
           ],
@@ -778,6 +864,7 @@ class _StakeoutPanel extends StatelessWidget {
   const _StakeoutPanel({
     required this.position,
     required this.heading,
+    this.motionHeading,
     required this.compassAlive,
     required this.staleSeconds,
     required this.rtcmAgeSeconds,
@@ -790,10 +877,15 @@ class _StakeoutPanel extends StatelessWidget {
     required this.onNext,
     this.onExpand,
     this.showDial = true,
+    this.northUp = false,
   });
 
   final RtkPosition? position;
   final double? heading;
+
+  /// Kurs z ruchu (kolejne pozycje RTK podczas marszu) — jeśli świeży, strzałka
+  /// i wskazówka słowna używają go zamiast kompasu (pewniejszy w marszu).
+  final double? motionHeading;
 
   /// Czy [heading] pochodzi z kompasu (magnetometru)? Gdy nie — to kurs z GPS,
   /// który aktualizuje się TYLKO w ruchu (na stojąco tarcza zamiera).
@@ -822,6 +914,10 @@ class _StakeoutPanel extends StatelessWidget {
   /// tam dużą tarczę rysuje sam ekran).
   final bool showDial;
 
+  /// Tryb „północ u góry": tarcza i wskazówki w stałym układzie świata
+  /// (kompas ignorowany — przy poziomym montażu telefonu bywa niestabilny).
+  final bool northUp;
+
   static String _fixLabel(FixType f) => switch (f) {
         FixType.rtkFixed => 'RTK Fixed',
         FixType.rtkFloat => 'RTK Float',
@@ -848,7 +944,13 @@ class _StakeoutPanel extends StatelessWidget {
       final distance = distanceMeters(current, target);
       final bearing = bearingDegrees(current, target);
       final offset = offsetNorthEast(current, target);
-      final hasHeading = heading != null;
+      // „Północ u góry" celowo ignoruje kompas — wskazówki w układzie N/E.
+      final double? h = northUp ? null : heading;
+      // Podczas marszu (tryb strzałki) prowadź wg kursu z ruchu — działa
+      // niezależnie od trybu tarczy i wiarygodności kompasu.
+      final double? hWalk =
+          distance >= _nearThreshold ? (motionHeading ?? h) : h;
+      final hasHeading = h != null;
       final arrived = distance <= _arrivedThreshold;
       final accentColor = arrived ? Colors.green.shade600 : theme.colorScheme.primary;
 
@@ -856,8 +958,8 @@ class _StakeoutPanel extends StatelessWidget {
       final String cue;
       if (arrived) {
         cue = 'na punkcie';
-      } else if (hasHeading) {
-        cue = turnInstruction(relativeBearing(bearing, heading!));
+      } else if (hWalk != null) {
+        cue = turnInstruction(relativeBearing(bearing, hWalk));
       } else {
         cue = 'kierunek ${cardinal(bearing)} (${bearing.round()}°)';
       }
@@ -871,7 +973,8 @@ class _StakeoutPanel extends StatelessWidget {
               child: _GuidanceIndicator(
                 distance: distance,
                 bearing: bearing,
-                heading: heading,
+                heading: h,
+                arrowHeading: hWalk,
                 color: accentColor,
                 gridColor: theme.dividerColor,
                 textColor: theme.textTheme.bodySmall!.color!,
@@ -901,7 +1004,7 @@ class _StakeoutPanel extends StatelessWidget {
                 if (hasHeading && !arrived)
                   Builder(builder: (context) {
                     final fr =
-                        forwardRight(offset.north, offset.east, heading!);
+                        forwardRight(offset.north, offset.east, h);
                     return Text(
                       '${fr.forward >= 0 ? '↑ przód' : '↓ tył'} '
                       '${formatDistance(fr.forward.abs())} · '
@@ -923,7 +1026,7 @@ class _StakeoutPanel extends StatelessWidget {
                   staleSeconds != null
                       ? '±${p.accuracy.toStringAsFixed(2)} m · brak danych'
                       : '±${p.accuracy.toStringAsFixed(2)} m · ${_fixLabel(p.fixType)}'
-                          '${!hasHeading ? ' · brak kompasu' : compassAlive ? '' : ' · kierunek z GPS (odświeża się w ruchu)'}',
+                          '${northUp ? ' · północ u góry' : !hasHeading ? ' · brak kompasu' : compassAlive ? '' : ' · kierunek z GPS (odświeża się w ruchu)'}',
                   style: theme.textTheme.bodySmall,
                 ),
                 if (staleSeconds != null)
@@ -1032,6 +1135,7 @@ class _GuidanceIndicator extends StatelessWidget {
     required this.distance,
     required this.bearing,
     required this.heading,
+    this.arrowHeading,
     required this.color,
     required this.gridColor,
     required this.textColor,
@@ -1041,6 +1145,10 @@ class _GuidanceIndicator extends StatelessWidget {
   final double distance;
   final double bearing;
   final double? heading;
+
+  /// Kierunek dla trybu strzałki (marsz) — zwykle kurs z ruchu RTK. Gdy null,
+  /// strzałka używa [heading] jak tarcza.
+  final double? arrowHeading;
   final Color color;
   final Color gridColor;
   final Color textColor;
@@ -1051,11 +1159,13 @@ class _GuidanceIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasHeading = heading != null;
-    final dirDeg = hasHeading ? relativeBearing(bearing, heading!) : bearing;
-    final angleRad = dirDeg * pi / 180;
-
     final isArrow = distance >= _nearThreshold;
+    // Strzałka marszu ma własne źródło kierunku (kurs z ruchu); tarcza
+    // z bliska trzyma się trybu (kompas / północ u góry).
+    final double? h = isArrow ? (arrowHeading ?? heading) : heading;
+    final hasHeading = h != null;
+    final dirDeg = hasHeading ? relativeBearing(bearing, h) : bearing;
+    final angleRad = dirDeg * pi / 180;
     final Widget core = isArrow
         ? Transform.rotate(
             angle: angleRad,

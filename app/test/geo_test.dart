@@ -190,6 +190,19 @@ void main() {
     });
   });
 
+  group('lerpAngleDeg — wygładzanie kompasu przez 0/360', () {
+    test('interpoluje po najkrótszej drodze przez północ', () {
+      expect(lerpAngleDeg(350, 10, 0.5), closeTo(0, 1e-9)); // 350→10 przez 0
+      expect(lerpAngleDeg(10, 350, 0.5), closeTo(0, 1e-9));
+      expect(lerpAngleDeg(0, 90, 0.5), closeTo(45, 1e-9));
+    });
+
+    test('t=0 zostaje, t=1 dochodzi do celu', () {
+      expect(lerpAngleDeg(120, 130, 0), closeTo(120, 1e-9));
+      expect(lerpAngleDeg(120, 130, 1), closeTo(130, 1e-9));
+    });
+  });
+
   group('applyCompassMirror — korekta odbitego kursu', () {
     test('odbicie zamienia E↔W, N i S bez zmian', () {
       expect(applyCompassMirror(90, true), 270); // E → W
