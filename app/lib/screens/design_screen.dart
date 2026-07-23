@@ -165,9 +165,38 @@ class _DesignScreenState extends State<DesignScreen> {
     );
     _others = _world.computeOthers(_design.id);
     _recompute();
+    // Widoczność per projekt: biała lista z modelu → zbiór ukrytych.
+    // Null = projekt sprzed tej funkcji (wszystko widoczne).
+    final vis = _design.visibleRefs;
+    if (vis != null) {
+      _hidden
+        ..addAll(_allRefKeys())
+        ..removeAll(vis);
+      // Świeży projekt (nic nie widać, brak elementów) — od razu otwórz
+      // arkusz widoczności, żeby dało się włączyć geometrie odniesienia.
+      if (vis.isEmpty && _design.elements.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _visibility();
+        });
+      }
+    }
   }
 
+  /// Klucze wszystkich OBCYCH geometrii, które można pokazać/ukryć w edytorze.
+  Set<String> _allRefKeys() => {
+        for (final p in widget.parcels) 'parcel:${p.id}',
+        for (final b in widget.buildings) 'building:${b.id}',
+        for (final d in widget.designs)
+          if (d.id != _design.id) 'design:${d.id}',
+      };
+
   void _recompute() => _computed = _world.computeDesign(_design);
+
+  /// Zoom o [delta] poziomów z zachowaniem środka (przyciski +/− na mapie).
+  void _zoomBy(double delta) {
+    final cam = _mapController.camera;
+    _mapController.move(cam.center, (cam.zoom + delta).clamp(3.0, 25.0));
+  }
 
   static double _parse(String s, double dflt) =>
       double.tryParse(s.replaceAll(',', '.')) ?? dflt;
@@ -956,6 +985,10 @@ class _DesignScreenState extends State<DesignScreen> {
                         } else {
                           _hidden.add(key);
                         }
+                        // Zapamiętaj wybór w projekcie (biała lista) — trwały
+                        // po zapisie projektu (zapis przy wyjściu z edytora).
+                        _design.visibleRefs =
+                            _allRefKeys().difference(_hidden);
                       }));
                 },
               );
@@ -1295,7 +1328,10 @@ class _DesignScreenState extends State<DesignScreen> {
                                 padding: const EdgeInsets.all(40)),
                         initialCenter: _world.frame.origin,
                         initialZoom: 17,
-                        maxZoom: 22,
+                        // 25 ≈ 3 mm/px na 50°N — rysowanie precyzyjnych linii.
+                        // Ortofoto powyżej natywnego zoomu jest rozciągane
+                        // (rozmyte), ale geometria wektorowa zostaje ostra.
+                        maxZoom: 25,
                         interactionOptions: InteractionOptions(
                           // Bez dwukliku-zoom — dwuklik usuwa linię roboczą.
                           flags: (_drag != null
@@ -1436,6 +1472,27 @@ class _DesignScreenState extends State<DesignScreen> {
                     ),
                   ),
                   const Positioned(top: 8, right: 8, child: BaseLayerControl()),
+                  // Przyciski zoomu — precyzyjne dobijanie powiększenia przy
+                  // rysowaniu (pinch na dużym zoomie jest zbyt zgrubny).
+                  Positioned(
+                    right: 8,
+                    top: 64,
+                    child: Column(
+                      children: [
+                        _ZoomButton(
+                          icon: Icons.add,
+                          tooltip: 'Przybliż',
+                          onTap: () => _zoomBy(1),
+                        ),
+                        const SizedBox(height: 6),
+                        _ZoomButton(
+                          icon: Icons.remove,
+                          tooltip: 'Oddal',
+                          onTap: () => _zoomBy(-1),
+                        ),
+                      ],
+                    ),
+                  ),
                   if (_pendingWorking)
                     const Positioned(
                       top: 8,
@@ -1973,6 +2030,40 @@ class _Banner extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(child: Text(text, style: const TextStyle(fontSize: 13))),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Mały okrągły przycisk zoomu na mapie projektanta (obok przełącznika
+/// podkładu) — pinch przy dużym powiększeniu jest zbyt zgrubny do rysowania.
+class _ZoomButton extends StatelessWidget {
+  const _ZoomButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, size: 22),
+          ),
         ),
       ),
     );

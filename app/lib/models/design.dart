@@ -135,6 +135,7 @@ class Design {
     required this.createdAt,
     List<DesignElement>? elements,
     List<GeomRef>? workingLines,
+    this.visibleRefs,
   })  : elements = elements ?? [],
         workingLines = workingLines ?? [];
 
@@ -148,12 +149,20 @@ class Design {
   /// tyczone ani eksportowane.
   final List<GeomRef> workingLines;
 
+  /// Klucze `kind:id` OBCYCH geometrii widocznych w edytorze tego projektu
+  /// (biała lista, zapisywana razem z projektem). `null` = projekt sprzed tej
+  /// funkcji → pokaż wszystko (zgodność wstecz). Nowy projekt dostaje pusty
+  /// zbiór: startuje z czystą mapą, a to, co użytkownik włączy w „Widoczność
+  /// geometrii", zostaje zapamiętane per projekt.
+  Set<String>? visibleRefs;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'created': createdAt.toIso8601String(),
         'elements': [for (final e in elements) e.toJson()],
         'working': [for (final w in workingLines) w.toJson()],
+        if (visibleRefs != null) 'visible': [...visibleRefs!]..sort(),
       };
 
   factory Design.fromJson(Map<String, dynamic> j) => Design(
@@ -169,6 +178,8 @@ class Design {
           for (final w in (j['working'] as List? ?? const []))
             GeomRef.fromJson(w as Map<String, dynamic>),
         ],
+        visibleRefs:
+            (j['visible'] as List?)?.map((e) => e as String).toSet(),
       );
 }
 

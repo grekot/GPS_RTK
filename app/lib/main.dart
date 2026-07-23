@@ -39,6 +39,7 @@ import 'services/building_store.dart';
 import 'services/design_store.dart';
 import 'services/export_service.dart';
 import 'services/kiut_service.dart';
+import 'services/layer_visibility_store.dart';
 import 'services/manual_pdf.dart';
 import 'services/measured_point_store.dart';
 import 'services/ntrip_store.dart';
@@ -170,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Building> _buildings = [];
   List<Design> _designs = [];
   final Set<String> _hiddenLayers = {}; // ukryte warstwy mapy ('parcel:id' itd.)
+  final _layerStore = LayerVisibilityStore(); // trwałość _hiddenLayers
 
   @override
   void initState() {
@@ -179,6 +181,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadBuildings();
     _loadDesigns();
     _loadNtrip();
+    _layerStore.load().then((h) {
+      if (mounted && h.isNotEmpty) setState(() => _hiddenLayers.addAll(h));
+    });
     _bleStatusSub = _bleSource.statusMessages.listen(_showMessage);
     _usbStatusSub = _usbSource?.statusMessages.listen(_showMessage);
     _serialStatusSub = _serialSource?.statusMessages.listen(_showMessage);
@@ -290,6 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim(),
       createdAt: DateTime.now(),
+      // Nowy projekt: czysta mapa — obce geometrie domyślnie ukryte; edytor
+      // otworzy arkusz widoczności, by włączyć potrzebne odniesienia.
+      visibleRefs: {},
     ));
   }
 
@@ -382,6 +390,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       } else {
                         _hiddenLayers.add(key);
                       }
+                      // Zapamiętaj między uruchomieniami aplikacji.
+                      unawaited(_layerStore.save(_hiddenLayers));
                     })),
               );
           final empty = _parcels.isEmpty &&

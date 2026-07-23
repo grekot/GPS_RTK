@@ -428,4 +428,31 @@ void main() {
       expect(c[0].isEmpty, isTrue); // odniesienie nierozwiązywalne (cykl)
     });
   });
+
+  group('visibleRefs — widoczność warstw per projekt', () {
+    test('round-trip JSON zachowuje białą listę', () {
+      final d = Design(
+        id: 'x',
+        name: 'n',
+        createdAt: DateTime.utc(2026),
+        visibleRefs: {'parcel:1', 'design:abc'},
+      );
+      final back = Design.fromJson(d.toJson());
+      expect(back.visibleRefs, {'parcel:1', 'design:abc'});
+    });
+
+    test('stary zapis bez pola visible → null (wszystko widoczne)', () {
+      final j = Design(id: 'x', name: 'n', createdAt: DateTime.utc(2026))
+          .toJson();
+      expect(j.containsKey('visible'), isFalse);
+      expect(Design.fromJson(j).visibleRefs, isNull);
+    });
+
+    test('pusty zbiór (nowy projekt) przeżywa round-trip jako pusty, nie null',
+        () {
+      final d = Design(
+          id: 'x', name: 'n', createdAt: DateTime.utc(2026), visibleRefs: {});
+      expect(Design.fromJson(d.toJson()).visibleRefs, isEmpty);
+    });
+  });
 }
