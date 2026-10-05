@@ -1338,7 +1338,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Android z assetem .apk → pobranie w apce + systemowy instalator (bez
     // przeglądarki). Inne platformy / brak .apk → otwarcie linku.
     if (Platform.isAndroid && u.apkUrl != null) {
-      await _downloadAndInstall(u.apkUrl!);
+      await _downloadAndInstall(u.apkUrl!, sha256: u.apkSha256);
     } else {
       try {
         await launchUrl(Uri.parse(u.apkUrl ?? u.releaseUrl),
@@ -1352,8 +1352,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// wersja (stały debug-keystore w repo) — inaczej Android odmówi instalacji
   /// („package conflicts with an existing package"). Pierwszą wersję z nowym
   /// kluczem trzeba zainstalować raz ręcznie.
-  Future<void> _downloadAndInstall(String apkUrl) async {
+  Future<void> _downloadAndInstall(String apkUrl, {String? sha256}) async {
     final progress = ValueNotifier<double>(0);
+    final cancel = UpdateCancelToken();
     unawaited(showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -1370,11 +1371,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+        actions: [
+          // Zawieszone łącze nie może zablokować aplikacji na stałe.
+          TextButton(onPressed: cancel.cancel, child: const Text('Anuluj')),
+        ],
       ),
     ));
     try {
-      final path = await UpdateService()
-          .downloadApk(apkUrl, onProgress: (v) => progress.value = v);
+      final path = await UpdateService().downloadApk(apkUrl,
+          onProgress: (v) => progress.value = v,
+          expectedSha256: sha256,
+          cancel: cancel);
       if (!mounted) return;
       Navigator.of(context).pop(); // zamknij dialog postępu
       final res = await OpenFilex.open(
@@ -1389,7 +1396,9 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // zamknij dialog postępu
-        _showMessage('Pobieranie nie powiodło się: ${_shortError(e)}');
+        _showMessage(e is UpdateCancelled
+            ? 'Anulowano pobieranie aktualizacji.'
+            : 'Pobieranie nie powiodło się: ${_shortError(e)}');
       }
     } finally {
       progress.dispose();

@@ -53,6 +53,7 @@ dependencies:
   package_info_plus: ^10.1.0 # wersja apki (do sprawdzania aktualizacji)
   url_launcher: ^6.3.0 # otwarcie strony release (fallback / desktop)
   open_filex: ^4.7.0 # samoaktualizacja: uruchomienie pobranego APK w instalatorze (Android)
+  crypto: ^3.0.7
 
 # Lokalna kopia flutter_libserialport bez platformy Android (pub.dev 0.4.0 ma
 # androidowy plugin na usuniętym API v1 i nie buduje APK). Desktop bez zmian.
