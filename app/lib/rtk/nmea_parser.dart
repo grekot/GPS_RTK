@@ -66,7 +66,21 @@ final List<String> receiverSetupCommands = [
 /// GGA daje pozycję i typ fixa, GST/PQTMEPE dokładność, RMC kurs. Pozycję
 /// emituje przy zdaniu GGA. Wymaga poprawnej sumy kontrolnej `*HH`.
 class NmeaParser {
+  NmeaParser({
+    DateTime Function()? clock,
+    this.accuracyMaxAge = const Duration(seconds: 3),
+  }) : _now = clock ?? DateTime.now;
+
+  final DateTime Function() _now;
+
+  /// Jak długo estymata z GST/PQTMEPE jest ważna. Gdy moduł przestanie ją
+  /// słać (np. restart modułu kasuje sesyjne włączenie PQTMEPE), po tym czasie
+  /// wracamy do szacunku z fixa+HDOP — inaczej każda GGA niosłaby starą,
+  /// zbyt optymistyczną wartość (np. 2 cm przy spadku z Fixed do Float).
+  final Duration accuracyMaxAge;
+
   double? _accuracy; // z GST lub PQTMEPE [m]
+  DateTime? _accuracyAt;
   double? _course; // z RMC [°]
 
   /// Dodaje jedną linię NMEA. Zwraca [RtkPosition] dla ważnej GGA, inaczej null.
@@ -104,7 +118,18 @@ class NmeaParser {
   void _epe(List<String> f) {
     if (f[0] != 'PQTMEPE' || f.length < 6) return;
     final e2d = double.tryParse(f[5]);
-    if (e2d != null && e2d > 0 && e2d.isFinite) _accuracy = e2d;
+    if (e2d != null && e2d > 0 && e2d.isFinite) _setAccuracy(e2d);
+  }
+
+  void _setAccuracy(double v) {
+    _accuracy = v;
+    _accuracyAt = _now();
+  }
+
+  double? _freshAccuracy() {
+    final at = _accuracyAt;
+    if (at == null || _now().difference(at) > accuracyMaxAge) return null;
+    return _accuracy;
   }
 
   void _gst(List<String> f) {
@@ -113,7 +138,7 @@ class NmeaParser {
     final sLat = double.tryParse(f[6]);
     final sLon = double.tryParse(f[7]);
     if (sLat != null && sLon != null) {
-      _accuracy = sqrt(sLat * sLat + sLon * sLon);
+      _setAccuracy(sqrt(sLat * sLat + sLon * sLon));
     }
   }
 
@@ -146,11 +171,11 @@ class NmeaParser {
       latitude: lat,
       longitude: lon,
       altitude: alt,
-      accuracy: _accuracy ?? estimateAccuracy(fix, hdop),
+      accuracy: _freshAccuracy() ?? estimateAccuracy(fix, hdop),
       fixType: fix,
       satellites: sats,
       heading: _course,
-      timestamp: DateTime.now(),
+      timestamp: _now(),
     );
   }
 

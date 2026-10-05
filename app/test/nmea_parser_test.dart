@@ -101,6 +101,31 @@ void main() {
     expect(p!.accuracy, closeTo(0.05, 1e-6));
   });
 
+  test('PQTMEPE wygasa, gdy moduł przestaje ją wysyłać', () {
+    var now = DateTime(2026, 10, 5, 12);
+    final parser = NmeaParser(clock: () => now);
+    const gga = 'GNGGA,120000.00,5000.000000,N,02000.000000,E,5,18,1.0,250.0,M,40,M,1.0,0000';
+    parser.addLine(_nmea('PQTMEPE,2,0.03,0.04,0.06,0.02,0.08'));
+    expect(parser.addLine(_nmea(gga))!.accuracy, closeTo(0.02, 1e-6));
+    now = now.add(const Duration(seconds: 2));
+    expect(parser.addLine(_nmea(gga))!.accuracy, closeTo(0.02, 1e-6));
+    now = now.add(const Duration(seconds: 2)); // 4 s bez EPE
+    // Float (fix 5): powrót do szacunku z fixa (0,5 m × HDOP), nie stare 2 cm.
+    expect(parser.addLine(_nmea(gga))!.accuracy, closeTo(0.5, 1e-6));
+  });
+
+  test('półkula S/W daje ujemne współrzędne', () {
+    final p = NmeaParser().addLine(_nmea(
+        'GNGGA,120000.00,3352.500000,S,15112.000000,W,1,08,1.0,10.0,M,0,M,,'));
+    expect(p!.latitude, closeTo(-33.875, 1e-9));
+    expect(p.longitude, closeTo(-151.2, 1e-9));
+  });
+
+  test('GGA bez pozycji (brak fixa, puste pola) → brak pozycji', () {
+    expect(NmeaParser().addLine(_nmea('GNGGA,120000.00,,,,,0,00,99.9,,,,,,')),
+        isNull);
+  });
+
   test('uszkodzone PQTMEPE nie psuje dokładności', () {
     final parser = NmeaParser();
     parser.addLine(_nmea('PQTMEPE,2,x,y,z')); // za krótkie / nie-liczby
