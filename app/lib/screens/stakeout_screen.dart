@@ -15,7 +15,9 @@ import '../measure/point_detail_sheet.dart';
 import '../models/measured_point.dart';
 import '../models/parcel.dart';
 import '../models/rtk_position.dart';
+import '../services/keep_awake.dart';
 import '../services/app_settings.dart';
+import '../services/beeper.dart';
 import '../services/export_service.dart';
 import '../services/measured_point_store.dart';
 import '../services/stakeout_report_pdf.dart';
@@ -151,6 +153,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
   @override
   void initState() {
     super.initState();
+    KeepAwake.instance.hold(this); // teren: ekran nie gaśnie (też bez „Start”)
     _subscription = widget.source.positions().listen(
       _onPosition,
       onError: (Object e) {
@@ -253,9 +256,10 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
       switch (zone) {
         case 3:
           HapticFeedback.heavyImpact();
-          SystemSound.play(SystemSoundType.alert);
+          Beeper.arrived(); // długi sygnał — przy tyczce patrzy się na grunt
         case 2:
           HapticFeedback.mediumImpact();
+          Beeper.near(); // krótki sygnał: < 1 m
         case 1:
           HapticFeedback.selectionClick();
       }
@@ -307,7 +311,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
       samples: result.samples,
       worstFix: result.worstFix,
       measuredAt: DateTime.now(),
-      label: 'pkt ${_targetIndex + 1}',
+      label: 'pkt $_targetLabel', // ta sama numeracja co panel i raport
       parcelId: widget.projectId,
       targetIndex: _targetIndex,
       devDistance: distanceMeters(_target, result.mean),
@@ -465,6 +469,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
 
   @override
   void dispose() {
+    KeepAwake.instance.release(this);
     _staleTimer?.cancel();
     _subscription?.cancel();
     _compassSub?.cancel();
@@ -1001,10 +1006,13 @@ class _StakeoutPanel extends StatelessWidget {
                 ),
                 // Odchyłka w układzie CIAŁA (dokąd przesunąć tyczkę względem
                 // kierunku patrzenia) — czytelniejsza niż statyczne N/E.
-                if (hasHeading && !arrived)
+                // Ten sam kurs co strzałka i komunikat słowny (w marszu: kurs
+                // z ruchu), inaczej przy kłamiącym kompasie linie przeczyłyby
+                // sobie nawzajem.
+                if (hWalk != null && !arrived)
                   Builder(builder: (context) {
                     final fr =
-                        forwardRight(offset.north, offset.east, h);
+                        forwardRight(offset.north, offset.east, hWalk);
                     return Text(
                       '${fr.forward >= 0 ? '↑ przód' : '↓ tył'} '
                       '${formatDistance(fr.forward.abs())} · '

@@ -223,7 +223,12 @@ void main() {
     src.ctrl.add(_rtkFixed(destinationLatLng(p1, 0, 1.0)));
     await tester.pump();
     await tester.pump();
-    expect(find.textContaining('w lewo'), findsOneWidget);
+    expect(find.text('w lewo'), findsOneWidget);
+    // Wiersz „przód/w prawo" liczony z TEGO SAMEGO kursu co strzałka: cel
+    // 10 m na N i 1 m na W od idącego na E → 1 m w tył, 10 m w lewo.
+    // (Wcześniej liczony z kompasu — przy kłamiącym kompasie przeczył strzałce.)
+    expect(find.textContaining('← w lewo 10,00 m'), findsOneWidget);
+    expect(find.textContaining('↓ tył'), findsOneWidget);
 
     await src.ctrl.close();
   });

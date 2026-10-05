@@ -9,7 +9,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'map/base_layers.dart';
 import 'map/tile_cache.dart';
@@ -34,6 +33,7 @@ import 'screens/mountpoint_picker.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stakeout_screen.dart';
 import 'services/app_settings.dart';
+import 'services/keep_awake.dart';
 import 'services/backup_service.dart';
 import 'services/building_store.dart';
 import 'services/design_store.dart';
@@ -364,11 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
     if (saved == true && mounted) {
-      if (_isRunning && AppSettings.instance.keepAwake) {
-        WakelockPlus.enable();
-      } else {
-        WakelockPlus.disable();
-      }
+      KeepAwake.instance.refresh();
     }
   }
 
@@ -562,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _start() {
     setState(() => _error = null);
-    if (AppSettings.instance.keepAwake) WakelockPlus.enable();
+    KeepAwake.instance.hold(this);
     _staleTicks = 0;
     _staleTimer?.cancel();
     _staleTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -608,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _stop() async {
-    WakelockPlus.disable();
+    KeepAwake.instance.release(this);
     _staleTimer?.cancel();
     _staleTimer = null;
     await _subscription?.cancel();
@@ -1713,6 +1709,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _usbStatusSub?.cancel();
     _serialStatusSub?.cancel();
     _bleTelemetrySub?.cancel();
+    KeepAwake.instance.release(this);
     super.dispose();
   }
 

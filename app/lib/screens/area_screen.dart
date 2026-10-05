@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../map/base_layers.dart';
 import '../models/rtk_position.dart';
+import '../services/keep_awake.dart';
 import '../services/export_service.dart';
 import '../sources/position_source.dart';
 import '../utils/dxf.dart';
@@ -34,6 +35,7 @@ class _AreaScreenState extends State<AreaScreen> {
   @override
   void initState() {
     super.initState();
+    KeepAwake.instance.hold(this); // teren: ekran nie gaśnie (też bez „Start”)
     _sub = widget.source.positions().listen(
           (p) => mounted ? setState(() => _pos = p) : null,
           onError: (_) {},
@@ -42,6 +44,7 @@ class _AreaScreenState extends State<AreaScreen> {
 
   @override
   void dispose() {
+    KeepAwake.instance.release(this);
     _sub?.cancel();
     super.dispose();
   }
