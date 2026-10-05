@@ -73,8 +73,21 @@ int ntripHeaderEnd(List<int> buf) {
   return -1;
 }
 
+/// Opóźnienie ponownej próby po [failures] kolejnych nieudanych połączeniach:
+/// [base]·2^(failures−1), ograniczone do [max]. Pierwsza próba po zerwaniu
+/// czeka [base] — chwilowy zanik sieci wraca szybko, a martwy caster nie jest
+/// bombardowany co 5 s (ASG-EUPOS potrafi blokować takie IP).
+Duration ntripRetryDelay(int failures, Duration base, Duration max) {
+  if (failures <= 1) return base;
+  final shift = min(failures - 1, 10); // bez przepełnienia
+  final ms = base.inMilliseconds * (1 << shift);
+  return ms >= max.inMilliseconds ? max : Duration(milliseconds: ms);
+}
+
 /// Klient strumienia poprawek NTRIP. Łączy się z casterem, po nagłówku przekazuje
-/// surowe RTCM przez [onRtcm], a [sendGga] wysyła pozycję (VRS). Auto-reconnect.
+/// surowe RTCM przez [onRtcm], a [sendGga] wysyła pozycję (VRS). Auto-reconnect
+/// z narastającym opóźnieniem; błędy trwałe (złe hasło, nieznany mountpoint)
+/// zatrzymują klienta zamiast ponawiać w nieskończoność.
 class NtripClient {
   NtripClient(
     this.config, {
@@ -82,6 +95,9 @@ class NtripClient {
     this.onStatus,
     this.onReady,
     this.staleTimeout = const Duration(seconds: 12),
+    this.headerTimeout = const Duration(seconds: 15),
+    this.retryBase = const Duration(seconds: 5),
+    this.retryMax = const Duration(seconds: 60),
   });
 
   final NtripConfig config;
@@ -94,118 +110,198 @@ class NtripClient {
 
   /// Gdy przez ten czas nie przyjdą żadne poprawki mimo „połączono", łącze jest
   /// martwe (VRS przestała nadawać / half-open TCP) → wymuszamy reconnect.
-  /// Automatyzuje to, co użytkownik robił ręcznie przez STOP→START.
   final Duration staleTimeout;
+
+  /// Ile czekać na nagłówek odpowiedzi po zestawieniu TCP. Caster, który
+  /// przyjął połączenie i milczy, inaczej wisiałby w „łączenie…" na zawsze.
+  final Duration headerTimeout;
+
+  /// Opóźnienie pierwszej ponownej próby i jego górny limit (backoff ×2).
+  final Duration retryBase;
+  final Duration retryMax;
 
   Socket? _socket;
   bool _running = false;
   bool _headerDone = false;
   int _rtcmBytes = 0; // ile bajtów poprawek przyszło w bieżącym połączeniu
+  int _failures = 0; // kolejne połączenia zakończone bez poprawek
   Timer? _staleTimer;
+  Timer? _headerTimer;
+  Timer? _retryTimer;
   final List<int> _buf = [];
 
+  /// Numer bieżącego połączenia. Każde [_connect], [start] i [stop] go
+  /// podbija, a callbacki starego socketu/timera sprawdzają, czy są aktualne.
+  /// Bez tego szybkie STOP→START uruchamiało zaległe ponowienie i drugi
+  /// socket, a oba wpychały RTCM do odbiornika (przeplecione ramki).
+  int _conn = 0;
+
+  /// Ostatni błąd trwały (klient zatrzymany) — np. złe hasło. Null = brak.
+  String? fatalError;
+
+  bool get running => _running;
+
   Future<void> start() async {
+    _cancelTimers();
     _running = true;
+    _failures = 0;
+    fatalError = null;
     await _connect();
   }
 
   Future<void> stop() async {
     _running = false;
-    _staleTimer?.cancel();
-    _staleTimer = null;
+    _conn++;
+    _cancelTimers();
     _socket?.destroy();
     _socket = null;
   }
 
   void sendGga(String gga) {
+    // Przed nagłówkiem caster v1 traktowałby GGA jako śmieci w żądaniu.
+    if (!_headerDone) return;
     try {
       _socket?.add(utf8.encode('$gga\r\n'));
     } catch (_) {/* zerwane łącze — reconnect zajmie się resztą */}
   }
 
+  void _cancelTimers() {
+    _staleTimer?.cancel();
+    _staleTimer = null;
+    _headerTimer?.cancel();
+    _headerTimer = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+  }
+
   Future<void> _connect() async {
     if (!_running) return;
+    final id = ++_conn;
     _headerDone = false;
     _rtcmBytes = 0;
-    _staleTimer?.cancel();
+    _cancelTimers();
     _buf.clear();
     try {
       onStatus?.call('NTRIP: łączenie…');
       final s = await Socket.connect(config.host, config.port,
           timeout: const Duration(seconds: 15));
+      if (id != _conn) {
+        s.destroy(); // w międzyczasie stop()/nowe połączenie
+        return;
+      }
       _socket = s;
       s.add(utf8.encode(buildNtripRequest(config)));
       await s.flush();
-      s.listen(_onData,
-          onError: (_) => _reconnect(), onDone: _reconnect, cancelOnError: true);
+      _headerTimer = Timer(headerTimeout, () {
+        if (id != _conn || _headerDone) return;
+        onStatus?.call('NTRIP: caster nie odpowiada '
+            '(${headerTimeout.inSeconds} s bez nagłówka)');
+        s.destroy();
+        _reconnect(id);
+      });
+      s.listen((d) => _onData(id, s, d),
+          onError: (_) => _reconnect(id),
+          onDone: () => _reconnect(id),
+          cancelOnError: true);
     } catch (e) {
+      if (id != _conn) return;
       onStatus?.call('NTRIP nieosiągalny: $e');
-      _reconnect();
+      _reconnect(id);
     }
   }
 
-  void _onData(List<int> data) {
+  void _onData(int id, Socket s, List<int> data) {
+    if (id != _conn) return;
     if (_headerDone) {
       if (_rtcmBytes == 0) onStatus?.call('NTRIP: odbieram poprawki');
       _rtcmBytes += data.length;
-      _armStale(); // świeże poprawki — resetuj watchdog
+      _failures = 0; // łącze żyje — kolejne zerwanie znów ponawia szybko
+      _armStale(id, s);
       onRtcm?.call(data);
       return;
     }
     _buf.addAll(data);
     final end = ntripHeaderEnd(_buf);
-    if (end == -1) return;
+    if (end == -1) {
+      // Nagłówek nie przychodzi, a bufor rośnie — to nie caster NTRIP.
+      if (_buf.length > 8192) _fatal(s, 'NTRIP: odpowiedź nie jest NTRIP');
+      return;
+    }
+    _headerTimer?.cancel();
     final header = String.fromCharCodes(_buf.sublist(0, end));
+    final upper = header.toUpperCase();
     // Zła/nieistniejąca nazwa mountpointu → caster odsyła sourcetable
     // („SOURCETABLE 200 OK"), co zawiera „200 OK" i mylnie wygląda na sukces.
-    if (header.toUpperCase().contains('SOURCETABLE')) {
-      onStatus?.call('NTRIP: mountpoint nieznany — caster zwrócił listę stacji. '
+    if (upper.contains('SOURCETABLE')) {
+      _fatal(
+          s,
+          'NTRIP: mountpoint nieznany — caster zwrócił listę stacji. '
           'Sprawdź nazwę mountpointu.');
-      _socket?.destroy();
+      return;
+    }
+    if (upper.contains(' 401') || upper.contains(' 403')) {
+      _fatal(s, 'NTRIP: odmowa dostępu (${header.split('\r\n').first}). '
+          'Sprawdź login i hasło.');
       return;
     }
     if (!ntripResponseOk(header)) {
       onStatus?.call('Caster odrzucił: ${header.split('\r\n').first}');
-      _socket?.destroy();
+      s.destroy(); // → onDone → ponowienie z backoffem (np. 503 przeciążony)
       return;
     }
     _headerDone = true;
     onStatus?.call('NTRIP: połączono');
     onReady?.call(); // wyślij GGA od razu → szybkie ustawienie VRS
-    _armStale();
+    _armStale(id, s);
     final rest = _buf.sublist(end);
+    _buf.clear();
     if (rest.isNotEmpty) {
       onStatus?.call('NTRIP: odbieram poprawki');
       _rtcmBytes += rest.length;
+      _failures = 0;
       onRtcm?.call(rest);
     }
-    _buf.clear();
+  }
+
+  /// Błąd, którego ponawianie nie naprawi — zatrzymaj klienta i pokaż powód.
+  void _fatal(Socket s, String message) {
+    fatalError = message;
+    onStatus?.call(message);
+    _running = false;
+    _conn++;
+    _cancelTimers();
+    s.destroy();
+    _socket = null;
   }
 
   /// Uzbraja watchdog braku poprawek: po [staleTimeout] bez RTCM wymusza
   /// reconnect (świeży strumień + GGA), bez czekania na ręczny STOP→START.
-  void _armStale() {
+  void _armStale(int id, Socket s) {
     _staleTimer?.cancel();
     _staleTimer = Timer(staleTimeout, () {
-      if (!_running) return;
+      if (!_running || id != _conn) return;
       onStatus?.call('NTRIP: brak poprawek ${staleTimeout.inSeconds} s — '
           'wznawiam połączenie…');
-      _socket?.destroy(); // → onDone → _reconnect
+      s.destroy(); // → onDone → _reconnect
     });
   }
 
-  void _reconnect() {
-    _staleTimer?.cancel();
+  void _reconnect(int id) {
+    if (id != _conn) return; // stary socket/timer — już obsłużone
+    _conn++; // kolejne callbacki tego połączenia (onDone po onError) — ignoruj
+    _cancelTimers();
     _socket = null;
     // Połączono, ale zero poprawek przed zerwaniem = baza nie nadaje.
     if (_headerDone && _rtcmBytes == 0) {
       onStatus?.call('NTRIP: połączono, ale baza nie wysłała poprawek '
           '(offline lub zła nazwa mountpointu).');
     }
-    if (_running) {
-      onStatus?.call('NTRIP: ponawiam za 5 s…');
-      Future.delayed(const Duration(seconds: 5), _connect);
-    }
+    _headerDone = false;
+    if (!_running) return;
+    _failures++;
+    final delay = ntripRetryDelay(_failures, retryBase, retryMax);
+    onStatus?.call('NTRIP: ponawiam za ${delay.inSeconds} s…');
+    _retryTimer = Timer(delay, _connect);
   }
 }
 
