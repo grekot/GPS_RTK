@@ -55,6 +55,10 @@ Tryb zapasowy (do rozważenia w v2): ESP32 sam łączy się z hotspotem telefonu
 > Dla aplikacji jedyna różnica to częstotliwość napływu NMEA (1 Hz przy DA vs do 10 Hz przy EA);
 > interfejs (NUS: NMEA↑ notify / RTCM↓ write) bez zmian.
 
+> **Decyzja 2026-10-05: docelowy tor to płytka GNSS → telefon kablem USB-OTG.** W praktyce
+> działa bez ESP32; most BLE i firmware zostają jako opcja (v2 / bezprzewodowo), nie priorytet.
+> Na długie sesje: kabel OTG z osobnym zasilaniem albo powerbank (płytkę zasila telefon).
+
 > **Dla sesji aplikacji (2026-06-13):** dodać źródło pozycji po **USB** (Android, moduł LC29HEA
 > przez USB-C / OTG, baud 115200) — pełna instrukcja: `elektronika/docs/09-instrukcja-app-usb.md`
 > (to klon `BleReceiverSource` z transportem `usb_serial`; `NmeaParser`/`NtripClient` współdzielone).

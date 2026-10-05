@@ -5,6 +5,13 @@
 > Kontekst sprzętu: [08-podlaczenie-stykowka.md](08-podlaczenie-stykowka.md) (wariant „test po USB"),
 > [05-pinout-firmware.md](05-pinout-firmware.md), instrukcja płytki: [../datasheety/LC29H-mozi-board-manual-CN.pdf](../datasheety/LC29H-mozi-board-manual-CN.pdf).
 
+> **Stan 2026-10-05 — zrealizowane; USB to docelowy tor pracy.** Źródło
+> `app/lib/sources/usb_receiver_source.dart` działa w terenie. Uwagi poniżej o baudzie
+> **115200 są nieaktualne**: zamówiona płytka nadaje **460800** (zmierzone na COM3) i to jest
+> domyślna wartość w ustawieniach aplikacji. Zrobione ponad plan: auto-reconnect po odpięciu
+> kabla, filtr VID w manifeście (`res/xml/device_filter.xml`, pamiętana zgoda na port),
+> wyłączanie zbędnych zdań NMEA (`$PAIR062`, sesyjnie) po otwarciu portu.
+
 ## 1. Cel i uzasadnienie
 Dodać **USB-serial GPS** (moduł LC29HEA przez USB-C / Android OTG) jako wymienne źródło pozycji,
 obok GPS telefonu, odbiornika BLE i logów NMEA. Po co:
