@@ -1,6 +1,15 @@
 # Artefakty budowania / zależności (nie wersjonujemy)
 firmware/.pio/
 app/build/
+app/android/build/
+
+# Pobrane/zbudowane APK i paczki (wydania są w GitHub Releases)
+*.apk
+gps-rtk-apk/
+gps-rtk-apk.zip
+
+# Wydruki 3D: G-code to wynik slicera (źródłem jest .stl)
+*.gcode
 app/.dart_tool/
 
 # Python (generatory KiCad)

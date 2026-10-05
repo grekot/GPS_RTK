@@ -13,6 +13,11 @@ on:
 permissions:
   contents: write          # potrzebne do utworzenia Release przy tagu v*
 
+# Kolejny push na main anuluje trwający build kontrolny (tagi zawsze do końca).
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,6 +52,14 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # Bramka jakości: release z czerwonymi testami nie trafi do „Sprawdź
+      # aktualizacje" na telefonie w terenie.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
       - name: Build debug APK
         # --build-name z tagu → apka raportuje wersję = tag (do „Sprawdź aktualizacje").
         run: flutter build apk --debug --build-name=${{ steps.ver.outputs.name }} --build-number=${{ github.run_number }}
@@ -57,6 +70,7 @@ jobs:
           name: gps-rtk-apk
           path: app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
+          retention-days: 7   # APK debug ma ~160 MB — nie zjadaj limitu miejsca
 
       - name: Attach APK to GitHub Release (only on v* tags)
         if: startsWith(github.ref, 'refs/tags/v')
