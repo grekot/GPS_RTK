@@ -19,7 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _compassMirror = AppSettings.instance.compassMirror;
 
   Future<void> _save() async {
-    await AppSettings(
+    await AppSettings.instance.copyWith(
       samples: _samples,
       requireFixed: _requireFixed,
       keepAwake: _keepAwake,

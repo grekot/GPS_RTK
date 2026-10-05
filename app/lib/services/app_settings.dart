@@ -56,6 +56,28 @@ class AppSettings {
     921600,
   ];
 
+  /// Kopia ze zmienionymi polami. Ekrany edytujące część ustawień muszą jej
+  /// używać — budowanie `AppSettings(...)` od zera resetowało pola, których
+  /// dany ekran nie zna (tak ginął tryb „Północ u góry" przy zapisie ustawień).
+  AppSettings copyWith({
+    int? samples,
+    bool? requireFixed,
+    bool? keepAwake,
+    int? ggaSeconds,
+    int? usbBaud,
+    bool? compassMirror,
+    bool? dialNorthUp,
+  }) =>
+      AppSettings(
+        samples: samples ?? this.samples,
+        requireFixed: requireFixed ?? this.requireFixed,
+        keepAwake: keepAwake ?? this.keepAwake,
+        ggaSeconds: ggaSeconds ?? this.ggaSeconds,
+        usbBaud: usbBaud ?? this.usbBaud,
+        compassMirror: compassMirror ?? this.compassMirror,
+        dialNorthUp: dialNorthUp ?? this.dialNorthUp,
+      );
+
   static AppSettings instance = AppSettings();
   static const _key = 'settings.v1';
 
