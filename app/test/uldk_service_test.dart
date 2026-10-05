@@ -71,6 +71,29 @@ void main() {
     );
   });
 
+  test('MULTIPOLYGON: największa część działki zamiast wyjątku', () {
+    final pts = UldkService.parseWktPolygon('SRID=4326;MULTIPOLYGON('
+        '((20.0 50.0,20.001 50.0,20.001 50.001,20.0 50.0)),'
+        '((21.0 50.0,21.01 50.0,21.01 50.01,21.0 50.01,21.0 50.0)))');
+    expect(pts, hasLength(5));
+    expect(pts.first.longitude, closeTo(21.0, 1e-9));
+  });
+
+  test('POLYGON z otworem: zwraca pierścień zewnętrzny, otwór pominięty', () {
+    final pts = UldkService.parseWktPolygon('POLYGON('
+        '(20.0 50.0,20.01 50.0,20.01 50.01,20.0 50.01,20.0 50.0),'
+        '(20.004 50.004,20.006 50.004,20.006 50.006,20.004 50.004))');
+    expect(pts, hasLength(5));
+    expect(pts[1].longitude, closeTo(20.01, 1e-9));
+  });
+
+  test('uszkodzone liczby w WKT → UldkException, nie FormatException', () {
+    expect(
+      () => UldkService.parseWktPolygon('POLYGON((20.0 x,1 2,3 4,20.0 x))'),
+      throwsA(isA<UldkException>()),
+    );
+  });
+
   test('parseBuilding wyciąga obrys i id (geom_wkt|id)', () {
     const body = '0\n'
         'SRID=4326;POLYGON((20.61 49.89,20.62 49.89,20.62 49.90,20.61 49.89))'

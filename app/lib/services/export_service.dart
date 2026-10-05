@@ -65,14 +65,18 @@ class ExportService {
   }
 
   /// Zapisuje bajty PDF do pliku tymczasowego i otwiera „Udostępnij".
-  static Future<void> sharePdf(Uint8List bytes, String filename) async {
+  static Future<void> sharePdf(
+    Uint8List bytes,
+    String filename, {
+    String subject = 'Instrukcja GPS RTK',
+  }) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(bytes);
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
-        subject: 'Instrukcja GPS RTK',
+        subject: subject,
       ),
     );
   }

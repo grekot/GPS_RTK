@@ -413,6 +413,7 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
                           icon: const Icon(Icons.delete_outline),
                           onPressed: () async {
                             await _measureStore.remove(m.id);
+                            if (!mounted) return; // ekran zamknięty w trakcie
                             setState(
                                 () => _measured.removeWhere((x) => x.id == m.id));
                             if (context.mounted) Navigator.of(context).pop();
@@ -449,7 +450,8 @@ class _StakeoutScreenState extends State<StakeoutScreen> {
         title: widget.title,
         points: _measured,
       );
-      await ExportService.sharePdf(bytes, 'raport_tyczenia.pdf');
+      await ExportService.sharePdf(bytes, 'raport_tyczenia.pdf',
+          subject: 'Raport tyczenia — ${widget.title}');
     } catch (e) {
       _snack('Nie udało się wygenerować raportu: $e');
     }

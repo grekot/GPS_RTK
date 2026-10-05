@@ -140,16 +140,44 @@ class UldkService {
     );
   }
 
-  /// Wyciąga zewnętrzny pierścień z geometrii WKT POLYGON
+  /// Wyciąga zewnętrzny pierścień z geometrii WKT POLYGON lub MULTIPOLYGON
   /// (np. "SRID=4326;POLYGON((20.61 49.89,20.62 49.89,...))").
+  ///
+  /// Pierścienie zewnętrzne to te otwierane przez „((" — otwory (po „),(")
+  /// są pomijane. Działka wieloczęściowa (MULTIPOLYGON) zwraca największą
+  /// część; wcześniej regex łapał „(((" i parsowanie liczb wywracało się
+  /// [FormatException] zamiast czytelnego błędu.
   static List<LatLng> parseWktPolygon(String wkt) {
-    final match = RegExp(r'POLYGON\s*\(\(([^)]+)').firstMatch(wkt);
-    if (match == null) {
+    if (!RegExp(r'POLYGON', caseSensitive: false).hasMatch(wkt)) {
       throw UldkException('Nieobsługiwany typ geometrii działki.');
     }
-    return match.group(1)!.split(',').map((pair) {
-      final xy = pair.trim().split(RegExp(r'\s+'));
-      return LatLng(double.parse(xy[1]), double.parse(xy[0]));
-    }).toList();
+    final rings = <List<LatLng>>[];
+    for (final m in RegExp(r'\(\(\s*([^()]+)\)').allMatches(wkt)) {
+      final ring = <LatLng>[];
+      for (final pair in m.group(1)!.split(',')) {
+        final xy = pair.trim().split(RegExp(r'\s+'));
+        final x = xy.isNotEmpty ? double.tryParse(xy[0]) : null;
+        final y = xy.length > 1 ? double.tryParse(xy[1]) : null;
+        if (x == null || y == null) {
+          throw UldkException('Uszkodzona geometria działki: "$pair".');
+        }
+        ring.add(LatLng(y, x));
+      }
+      if (ring.length >= 3) rings.add(ring);
+    }
+    if (rings.isEmpty) {
+      throw UldkException('Pusta geometria działki.');
+    }
+    double area(List<LatLng> r) {
+      var a = 0.0;
+      for (var i = 0; i < r.length; i++) {
+        final p = r[i], q = r[(i + 1) % r.length];
+        a += p.longitude * q.latitude - q.longitude * p.latitude;
+      }
+      return a.abs();
+    }
+
+    rings.sort((a, b) => area(b).compareTo(area(a)));
+    return rings.first;
   }
 }
