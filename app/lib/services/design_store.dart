@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/design.dart';
+import 'prefs_json.dart';
 
 /// Trwałość nazwanych projektów geometrii (lista [Design] w SharedPreferences).
 class DesignStore {
@@ -10,12 +11,7 @@ class DesignStore {
 
   Future<List<Design>> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return [];
-    final list = jsonDecode(raw) as List;
-    return [
-      for (final d in list) Design.fromJson(d as Map<String, dynamic>),
-    ];
+    return readJsonListPref(prefs, _key, Design.fromJson);
   }
 
   Future<void> saveAll(List<Design> designs) async {

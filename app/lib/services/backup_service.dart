@@ -8,6 +8,7 @@ import 'building_store.dart';
 import 'design_store.dart';
 import 'measured_point_store.dart';
 import 'parcel_store.dart';
+import 'photo_service.dart';
 
 /// Kopia / transfer wszystkich danych roboczych między urządzeniami
 /// (telefon ↔ Windows): zmierzone punkty, projekty geometrii, działki i budynki
@@ -22,7 +23,10 @@ class BackupService {
     DesignStore? designs,
     ParcelStore? parcels,
     BuildingStore? buildings,
-  })  : _measure = measure ?? MeasuredPointStore(),
+    Future<String> Function()? photosDirPath,
+  })  : _photosDirPath = photosDirPath ??
+            (() async => (await PhotoService.photosDir()).path),
+        _measure = measure ?? MeasuredPointStore(),
         _designs = designs ?? DesignStore(),
         _parcels = parcels ?? ParcelStore(),
         _buildings = buildings ?? BuildingStore();
@@ -31,6 +35,7 @@ class BackupService {
   final DesignStore _designs;
   final ParcelStore _parcels;
   final BuildingStore _buildings;
+  final Future<String> Function() _photosDirPath;
 
   static const formatVersion = 1;
 
@@ -72,9 +77,15 @@ class BackupService {
     if (j is! Map<String, dynamic> || j['app'] != 'gps_rtk') {
       throw const FormatException('To nie jest plik kopii GPS RTK.');
     }
+    final version = (j['version'] as num?)?.toInt() ?? 1;
+    if (version > formatVersion) {
+      throw FormatException('Kopia z nowszej wersji aplikacji (format '
+          '$version) — zaktualizuj aplikację przed importem.');
+    }
+    // Uszkodzony pojedynczy rekord jest pomijany, a nie wywraca całego importu.
     List<T> list<T>(String key, T Function(Map<String, dynamic>) f) => [
           for (final x in (j[key] as List? ?? const []))
-            f(x as Map<String, dynamic>),
+            if (_tryParse(x, f) case final T v) v,
         ];
     return (
       points: list('points', MeasuredPoint.fromJson),
@@ -84,14 +95,31 @@ class BackupService {
     );
   }
 
+  static T? _tryParse<T>(Object? x, T Function(Map<String, dynamic>) f) {
+    if (x is! Map<String, dynamic>) return null;
+    try {
+      return f(x);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Wczytuje kopię i **scala** z danymi na urządzeniu (po `id`). Zwraca liczby
   /// wczytanych rekordów per kategoria.
+  ///
+  /// Ścieżki zdjęć są przyjmowane tylko wewnątrz katalogu zdjęć tej aplikacji
+  /// (zdjęcia i tak nie są częścią kopii — z innego urządzenia ścieżka jest
+  /// bezużyteczna, a spreparowana mogłaby wskazać dowolny plik do eksportu).
   Future<({int points, int designs, int parcels, int buildings})> importJson(
       String raw) async {
     final b = parseBundle(raw);
-    for (final p in b.points) {
-      await _measure.update(p); // update = nadpisz po id / dodaj
-    }
+    final photos = await _photosDirPath();
+    await _measure.updateAll([
+      for (final p in b.points)
+        p.photoPath == null || PhotoService.isInPhotosDir(p.photoPath!, photos)
+            ? p
+            : p.copyWith(removePhoto: true),
+    ]);
     for (final d in b.designs) {
       await _designs.saveOne(d);
     }

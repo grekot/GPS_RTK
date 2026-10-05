@@ -103,6 +103,18 @@ class DesignElement {
         'curvePoints': curvePoints,
       };
 
+  /// Jak [DesignElement.fromJson], ale uszkodzony element / nieznane
+  /// narzędzie (np. z nowszej wersji aplikacji) daje null — pomijamy jeden
+  /// element zamiast tracić cały projekt.
+  static DesignElement? tryFromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return null;
+    try {
+      return DesignElement.fromJson(j);
+    } catch (_) {
+      return null;
+    }
+  }
+
   factory DesignElement.fromJson(Map<String, dynamic> j) {
     final e = DesignElement(
       tool: ToolType.values.byName(j['tool'] as String),
@@ -172,7 +184,7 @@ class Design {
             DateTime.tryParse(j['created'] as String? ?? '') ?? DateTime.now(),
         elements: [
           for (final e in (j['elements'] as List? ?? const []))
-            DesignElement.fromJson(e as Map<String, dynamic>),
+            ?DesignElement.tryFromJson(e),
         ],
         workingLines: [
           for (final w in (j['working'] as List? ?? const []))

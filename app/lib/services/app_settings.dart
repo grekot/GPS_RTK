@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'prefs_json.dart';
+
 /// Globalne ustawienia aplikacji (trwałe). Czytane przez kod pomiarowy/NTRIP
 /// przez [AppSettings.instance], zapisywane z ekranu ustawień.
 class AppSettings {
@@ -83,9 +85,8 @@ class AppSettings {
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return;
-    final j = jsonDecode(raw) as Map<String, dynamic>;
+    final j = await readJsonPref(prefs, _key);
+    if (j is! Map<String, dynamic>) return; // brak/uszkodzone → domyślne
     instance = AppSettings(
       samples: (j['samples'] as num?)?.toInt() ?? 20,
       requireFixed: j['requireFixed'] as bool? ?? false,

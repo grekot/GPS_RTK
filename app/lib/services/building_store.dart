@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/building.dart';
+import 'prefs_json.dart';
 
 /// Trwały magazyn wczytanych obrysów budynków (dostępne offline po pobraniu).
 class BuildingStore {
@@ -10,12 +11,7 @@ class BuildingStore {
 
   Future<List<Building>> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return [];
-    final list = jsonDecode(raw) as List;
-    return [
-      for (final item in list) Building.fromJson(item as Map<String, dynamic>),
-    ];
+    return readJsonListPref(prefs, _key, Building.fromJson);
   }
 
   Future<void> save(List<Building> buildings) async {

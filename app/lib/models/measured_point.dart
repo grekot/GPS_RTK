@@ -121,7 +121,9 @@ class MeasuredPoint {
         rms: (j['rms'] as num).toDouble(),
         meanAccuracy: (j['acc'] as num).toDouble(),
         samples: j['samples'] as int,
-        worstFix: FixType.values.byName(j['fix'] as String),
+        // Nieznana wartość (np. z nowszej wersji) → najgorszy fix, zamiast
+        // wywracać wczytanie wszystkich punktów.
+        worstFix: FixType.values.asNameMap()[j['fix']] ?? FixType.none,
         measuredAt: DateTime.parse(j['at'] as String),
         label: j['label'] as String?,
         parcelId: j['parcelId'] as String?,

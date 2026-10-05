@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/parcel.dart';
+import 'prefs_json.dart';
 
 /// Lokalny magazyn wczytanych działek — dostępne offline po pobraniu.
 class ParcelStore {
@@ -10,12 +11,7 @@ class ParcelStore {
 
   Future<List<Parcel>> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return [];
-    final list = jsonDecode(raw) as List;
-    return [
-      for (final item in list) Parcel.fromJson(item as Map<String, dynamic>),
-    ];
+    return readJsonListPref(prefs, _key, Parcel.fromJson);
   }
 
   Future<void> save(List<Parcel> parcels) async {

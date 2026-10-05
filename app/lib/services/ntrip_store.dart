@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../rtk/ntrip_client.dart';
+import 'prefs_json.dart';
 
 /// Trwałe ustawienia NTRIP (caster ASG-EUPOS itp.).
 class NtripStore {
@@ -10,9 +11,8 @@ class NtripStore {
 
   Future<NtripConfig?> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return null;
-    return NtripConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final j = await readJsonPref(prefs, _key);
+    return j is Map<String, dynamic> ? NtripConfig.fromJson(j) : null;
   }
 
   Future<void> save(NtripConfig config) async {
