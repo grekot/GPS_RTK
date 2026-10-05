@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 
 import '../models/rtk_position.dart';
+import '../rtk/nmea_line_assembler.dart';
 import '../rtk/nmea_parser.dart';
 import '../rtk/ntrip_client.dart';
 import '../services/app_settings.dart';
@@ -34,7 +35,7 @@ class SerialReceiverSource extends SharedPositionSource
   Stream<String> get statusMessages => _status.stream;
 
   final _parser = NmeaParser();
-  final StringBuffer _lineBuf = StringBuffer();
+  final _lines = NmeaLineAssembler();
   SerialPort? _port;
   SerialPortReader? _reader;
   SerialPortConfig? _config;
@@ -114,7 +115,7 @@ class SerialReceiverSource extends SharedPositionSource
       // Włącz raport estymaty błędu pozycji (PQTMEPE @1 Hz) — realna
       // dokładność zamiast szacunku z HDOP; niekrytyczne, gdy się nie uda.
       try {
-        port.write(Uint8List.fromList(ascii.encode(enableEpeCommand)),
+        port.write(Uint8List.fromList(ascii.encode(receiverSetupCommands.join())),
             timeout: 1000);
       } catch (_) {}
       _maybeStartNtrip();
@@ -123,23 +124,14 @@ class SerialReceiverSource extends SharedPositionSource
     }
   }
 
-  // Buforowanie strumienia w linie NMEA — identyczne jak w BLE/USB.
   void _onNmeaBytes(List<int> bytes, StreamController<RtkPosition> ctrl) {
-    _lineBuf.write(String.fromCharCodes(bytes));
-    var rest = _lineBuf.toString();
-    int nl;
-    while ((nl = rest.indexOf('\n')) != -1) {
-      final line = rest.substring(0, nl);
-      rest = rest.substring(nl + 1);
+    for (final line in _lines.add(bytes)) {
       final pos = _parser.addLine(line);
       if (pos != null) {
         _last = pos;
         if (!ctrl.isClosed) ctrl.add(pos);
       }
     }
-    _lineBuf
-      ..clear()
-      ..write(rest);
   }
 
   void _maybeStartNtrip() {
@@ -207,6 +199,6 @@ class SerialReceiverSource extends SharedPositionSource
       _config?.dispose();
     } catch (_) {}
     _config = null;
-    _lineBuf.clear();
+    _lines.clear();
   }
 }

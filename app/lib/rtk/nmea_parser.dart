@@ -44,6 +44,24 @@ String buildNmeaCommand(String body) =>
 /// jej nie zna, po prostu nie odpowie — dokładność wróci do szacunku z HDOP.
 final String enableEpeCommand = buildNmeaCommand('PQTMCFGMSGRATE,W,PQTMEPE,1,2');
 
+/// Komendy wysyłane do odbiornika po otwarciu portu (sesyjnie, BEZ
+/// `PQTMSAVEPAR` — nic nie zapisujemy do flash modułu).
+///
+/// LC29HEA domyślnie nadaje GGA, GLL, GSA, GSV, RMC i VTG. Aplikacja używa
+/// tylko GGA (pozycja/fix), RMC (kurs) i PQTMEPE (estymata błędu). Wyłączenie
+/// reszty (`$PAIR062,<typ>,0`) kilkukrotnie zmniejsza ruch na porcie — przy
+/// 460800 bps i 10 Hz to mniej urwanych linii i mniej pracy CPU telefonu.
+/// Moduł nieznający komend (inny producent) po prostu je zignoruje.
+final List<String> receiverSetupCommands = [
+  buildNmeaCommand('PAIR062,0,1'), // GGA on
+  buildNmeaCommand('PAIR062,4,1'), // RMC on
+  buildNmeaCommand('PAIR062,1,0'), // GLL off
+  buildNmeaCommand('PAIR062,2,0'), // GSA off
+  buildNmeaCommand('PAIR062,3,0'), // GSV off
+  buildNmeaCommand('PAIR062,5,0'), // VTG off
+  enableEpeCommand,
+];
+
 /// Parser strumienia NMEA z odbiornika GNSS. Akumuluje stan między zdaniami:
 /// GGA daje pozycję i typ fixa, GST/PQTMEPE dokładność, RMC kurs. Pozycję
 /// emituje przy zdaniu GGA. Wymaga poprawnej sumy kontrolnej `*HH`.

@@ -5,6 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../models/device_telemetry.dart';
 import '../models/rtk_position.dart';
+import '../rtk/nmea_line_assembler.dart';
 import '../rtk/nmea_parser.dart';
 import '../rtk/ntrip_client.dart';
 import '../services/app_settings.dart';
@@ -38,7 +39,7 @@ class BleReceiverSource extends SharedPositionSource implements NtripFlowInfo {
   Stream<DeviceTelemetry> get telemetry => _telemetry.stream;
 
   final _parser = NmeaParser();
-  final StringBuffer _lineBuf = StringBuffer();
+  final _lines = NmeaLineAssembler();
   BluetoothDevice? _device;
   BluetoothCharacteristic? _rx;
   NtripClient? _ntrip;
@@ -123,21 +124,13 @@ class BleReceiverSource extends SharedPositionSource implements NtripFlowInfo {
   }
 
   void _onNmeaBytes(List<int> bytes, StreamController<RtkPosition> ctrl) {
-    _lineBuf.write(String.fromCharCodes(bytes));
-    var rest = _lineBuf.toString();
-    int nl;
-    while ((nl = rest.indexOf('\n')) != -1) {
-      final line = rest.substring(0, nl);
-      rest = rest.substring(nl + 1);
+    for (final line in _lines.add(bytes)) {
       final pos = _parser.addLine(line);
       if (pos != null) {
         _last = pos;
         if (!ctrl.isClosed) ctrl.add(pos);
       }
     }
-    _lineBuf
-      ..clear()
-      ..write(rest);
   }
 
   /// Subskrybuje opcjonalną charakterystykę telemetrii „status". Brak char.
@@ -227,6 +220,6 @@ class BleReceiverSource extends SharedPositionSource implements NtripFlowInfo {
     } catch (_) {}
     _device = null;
     _rx = null;
-    _lineBuf.clear();
+    _lines.clear();
   }
 }
